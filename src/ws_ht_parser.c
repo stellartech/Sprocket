@@ -22,7 +22,11 @@
 
 // This parser is specifically for in incoming WebSocket HTTP Upgrade Request 
 // for a WebSocket. Anything else will be rejected.
+//
+// Makes use of the nodejs project's http_parser library:-
+// https://github.com/nodejs/http-parser
 
+#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 #include <jansson.h>
@@ -35,6 +39,7 @@
 struct _userdata {
 	char	header[MAX_HEADER_SIZE];
 	json_t	*p_json;
+	int     flag_lowercase_headers;
 };
 typedef struct _userdata userdata_t;
 
@@ -68,6 +73,10 @@ on_message_begin(http_parser *inp)
 static int 
 on_message_complete(http_parser *inp) 
 {
+	if(inp && inp->data) {
+		userdata_t *pu = (userdata_t*)inp->data;
+		json_object_set(pu->p_json, "method", json_string(http_method_str(inp->method)));
+	}
 	return 0;
 }
 
@@ -75,6 +84,15 @@ static int
 on_headers_complete(http_parser *inp) 
 {
 	return 0;
+}
+
+static inline void
+header_tolower(char *inp, size_t in_len) 
+{
+	while(in_len--) {
+		*inp = tolower(*inp);
+		inp++;
+	}
 }
 
 static int 
@@ -91,7 +109,12 @@ on_header_field(http_parser *inp, const char *inp_value, size_t in_len)
 					break;
 				}
 			}
-			if(ok) memcpy(pu->header, inp_value, in_len);
+			if(ok) {
+				memcpy(pu->header, inp_value, in_len);
+				if(pu->flag_lowercase_headers) {
+					header_tolower(pu->header, in_len);
+				}
+			} 
         	}
 	}
         return 0;
@@ -127,7 +150,7 @@ on_url(http_parser *inp, const char *inp_value, size_t in_len)
 {
         if(in_len > 0 && inp_value && inp && inp->data) {
                 userdata_t *pu = (userdata_t*)inp->data;
-                json_object_set_new(pu->p_json, "URI", json_stringn(inp_value, in_len));
+                json_object_set_new(pu->p_json, "uri", json_stringn(inp_value, in_len));
         }        
         return 0;
 }
@@ -165,17 +188,18 @@ htparse_websocket_upgrade_request(
 	int in_bufsize, 
 	json_t *outp_json, 
 	int *outp_is_upgrade, 
-	int in_check_hdrs)
+	int in_check_hdrs,
+	int in_force_headers_lowercase)
 {
 	size_t rval;
+	userdata_t userdata;
 	struct http_parser parser;
-	if(in_bufsize >= MAX_BUFFER_SIZE) {
+	if(in_bufsize > MAX_BUFFER_SIZE || outp_json == NULL || !json_is_object(outp_json)) {
 		return -1;
 	}
-	if(outp_json == NULL) return -1;
-	userdata_t userdata;
 	memset(userdata.header, 0, MAX_HEADER_SIZE);
 	userdata.p_json = outp_json;
+	userdata.flag_lowercase_headers = in_force_headers_lowercase;
 	parser.data = &userdata;
 	http_parser_init(&parser, HTTP_REQUEST);
 	rval = http_parser_execute(&parser, &settings, in_buffer, in_bufsize);
@@ -204,38 +228,4 @@ htparse_websocket_upgrade_request(
 	}
 	return rval;
 }
-
-#if 0
-// Test harness
-#include <stdio.h>
-static const char data[] =
-    "GET /connect/0123456789012345678901234567891 HTTP/1.1\r\n"
-    "Host: github.com\r\n"
-    "Upgrade: WebSocket\r\n"
-    "Connection: Upgrade\r\n"
-    "Origin: http://example.com\r\n"
-    "Sec-WebSocket-Key: foobarbaz\r\n"
-    "Sec-WebSocket-Extensions: websocket-extensions\r\n"
-    "Sec-WebSocket-Accept: websocket-accepts\r\n" 
-    "Sec-WebSocket-Protocol: chat, superchat\r\n"
-    "Sec-WebSocket-Version: 13\r\n"
-    "WebSocket-Protocol: sample\r\n\r\n";
-static const size_t data_len = sizeof(data) - 1;
-
-int main(int argc, char** argv) 
-{
-	int is_upgrade = 0;
-	size_t rval = 0;
-	char *p_json_dump = NULL;
-	json_t *p_request = NULL;
-
-	p_request = json_object();
-	rval = htparse_websocket_upgrade_request(data, data_len, p_request, &is_upgrade, 0);
-	p_json_dump = json_dumps(p_request, JSON_INDENT(4));
-	fprintf(stdout, "Is upgrade = %d\nData size = %d\nRval = %d\nJson: %s\n", is_upgrade, (int)data_len, (int)rval, p_json_dump);
-	free(p_json_dump);
-	json_decref(p_request);
-	return 0;	
-}
-#endif
 
