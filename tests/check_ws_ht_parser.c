@@ -81,6 +81,7 @@ START_TEST(ws_ht_parser)
 	string_test(p, "host", "example.com");
 	string_test(p, "method", "GET");
 	string_test(p, "upgrade", "WebSocket");
+	string_test(p, "connection", "Upgrade");
 	string_test(p, "sec-websocket-key", "foobarbaz");
 	string_test(p, "sec-websocket-extensions", "websocket-extensions");
 }
