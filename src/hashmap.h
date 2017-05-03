@@ -1,6 +1,9 @@
 #ifndef HASHMAP_H_INCLUDED
 #define HASHMAP_H_INCLUDED
   
+#ifdef __cplusplus
+extern "C" {
+#endif
   
 typedef void (*hashmap_void_free_fn)(void*);
   
@@ -21,6 +24,9 @@ static inline hashmap_pt
 hashmap_new_dtor(hashmap_void_free_fn in_free_fn) {
 	return hashmap_ctor(32, in_free_fn);
 }
+
+size_t
+hashmap_count(hashmap_pt inp_self);
 
 void
 hashmap_free(hashmap_pt inp_self);
@@ -43,5 +49,9 @@ hashmap_remove(hashmap_pt inp_self,
 void
 hashmap_delete(hashmap_pt inp_self, const char *inp_key);
   
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* HASHMAP_H_INCLUDED */
 

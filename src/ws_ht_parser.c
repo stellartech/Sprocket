@@ -36,6 +36,10 @@
 #define MAX_HEADER_SIZE 256
 #define MAX_VALUE_SIZE  512
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct _userdata {
 	char	header[MAX_HEADER_SIZE];
 	json_t	*p_json;
@@ -75,7 +79,7 @@ on_message_complete(http_parser *inp)
 {
 	if(inp && inp->data) {
 		userdata_t *pu = (userdata_t*)inp->data;
-		json_object_set(pu->p_json, "method", json_string(http_method_str(inp->method)));
+		json_object_set_new(pu->p_json, "method", json_string(http_method_str(inp->method)));
 	}
 	return 0;
 }
@@ -228,4 +232,8 @@ htparse_websocket_upgrade_request(
 	}
 	return rval;
 }
+
+#ifdef __cplusplus
+}
+#endif
 

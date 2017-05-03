@@ -122,6 +122,7 @@ main(void)
 	SRunner *sr;
 	s = suite();
 	sr = srunner_create(s);
+	srunner_set_log (sr, "ws_ht_parser.log");
 	srunner_run_all(sr, CK_NORMAL);
 	number_failed = srunner_ntests_failed(sr);
 	srunner_free(sr);

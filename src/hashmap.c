@@ -6,6 +6,10 @@
   
 #include "hashmap.h"
   
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 static inline uint32_t hash_func(const char *inp_key, uint32_t in_len);
   
 struct _hashmap_bin;
@@ -15,18 +19,19 @@ typedef struct _hashmap_bin ** hashmap_bin_ppt;
   
 struct _hashmap_bin
 {
-    uint64_t        hash;
-    const char*     p_key;
-    void*           p_value;
-    hashmap_bin_pt    p_next;
+	uint64_t        hash;
+	const char*     p_key;
+	void*           p_value;
+	hashmap_bin_pt  p_next;
 };
   
 struct _hashmap
 {
-    int                 num_of_bins;
-    int                 bin_mask;
-    hashmap_void_free_fn  p_bin_void_free_fn;
-    hashmap_bin_ppt       p_bins;
+	size_t                num_of_entries;
+	int                   num_of_bins;
+	int                   bin_mask;
+	hashmap_void_free_fn  p_bin_void_free_fn;
+	hashmap_bin_ppt       p_bins;
 };
   
 hashmap_pt
@@ -57,7 +62,7 @@ hashmap_ctor(int in_num_bins, hashmap_void_free_fn in_free_fn)
     return p_self;
 }
   
-hashmap_bin_pt
+static hashmap_bin_pt
 hashmap_bin_free(hashmap_bin_pt inp_self, hashmap_void_free_fn in_fnf)
 {
     hashmap_bin_pt p_next = NULL;
@@ -119,95 +124,111 @@ hashmap_find(hashmap_pt inp_self, const char *inp_key)
 int
 hashmap_insert(hashmap_pt inp_self, const char *inp_key, void *inp_val)
 {
-    uint32_t hash = hash_func(inp_key, strlen(inp_key));
-    int bin = hash & inp_self->bin_mask;
-    hashmap_bin_pt p_bin = calloc(1, sizeof(hashmap_bin_t));
-    if(!p_bin) {
-        return -1;
-    }
-    p_bin->hash = hash;
-    p_bin->p_value = inp_val;
-    p_bin->p_key = strdup(inp_key);
-    if(!inp_self->p_bins[bin]) {
-        inp_self->p_bins[bin] = p_bin;
-    }
-    else {
-        p_bin->p_next = inp_self->p_bins[bin];
-        inp_self->p_bins[bin] = p_bin;
-    }
-    return 0;
+	uint32_t hash = hash_func(inp_key, strlen(inp_key));
+	int bin = hash & inp_self->bin_mask;
+	hashmap_bin_pt p_bin = calloc(1, sizeof(hashmap_bin_t));
+	if(!p_bin) {
+		return -1;
+	}
+	p_bin->hash = hash;
+	p_bin->p_value = inp_val;
+	p_bin->p_key = strdup(inp_key);
+	if(!inp_self->p_bins[bin]) {
+		inp_self->p_bins[bin] = p_bin;
+	}
+	else {
+		p_bin->p_next = inp_self->p_bins[bin];
+		inp_self->p_bins[bin] = p_bin;
+	}
+	inp_self->num_of_entries++;
+	return 0;
 }
   
 void*
 hashmap_remove(hashmap_pt inp_self, const char *inp_key)
 {
-    uint32_t hash = hash_func(inp_key, strlen(inp_key));
-    int bin = hash & inp_self->bin_mask;
-    hashmap_bin_pt p_prev = NULL, p_bin = inp_self->p_bins[bin];
-    while(p_bin) {
-        if(p_bin->hash == hash && !strcmp(inp_key, p_bin->p_key)) {
-            if(p_prev) {
-                p_prev->p_next = p_bin->p_next;
-            }
-            else {
-                inp_self->p_bins[bin] = p_bin->p_next;
-            }
-            return p_bin;
-        }
-        p_prev = p_bin;
-        p_bin = p_bin->p_next;
-    }
-    return NULL;
+	void *p_rval = NULL;
+	uint32_t hash = hash_func(inp_key, strlen(inp_key));
+	int bin = hash & inp_self->bin_mask;
+	hashmap_bin_pt p_prev = NULL, p_bin = inp_self->p_bins[bin];
+	while(p_bin) {
+		if(p_bin->hash == hash && !strcmp(inp_key, p_bin->p_key)) {
+			if(p_prev) {
+				p_prev->p_next = p_bin->p_next;
+			}
+			else {
+				inp_self->p_bins[bin] = p_bin->p_next;
+			}
+			inp_self->num_of_entries--;
+			p_rval = p_bin->p_value;
+			hashmap_bin_free(p_bin, NULL);
+			return p_rval;
+		}
+		p_prev = p_bin;
+		p_bin = p_bin->p_next;
+	}
+	return p_rval;;
 }
   
 void
 hashmap_delete(hashmap_pt inp_self, const char *inp_key)
 {
-    uint32_t hash = hash_func(inp_key, strlen(inp_key));
-    int bin = hash & inp_self->bin_mask;
-    hashmap_bin_pt p_prev = NULL, p_bin = inp_self->p_bins[bin];
-    while(p_bin) {
-        if(p_bin->hash == hash && !strcmp(inp_key, p_bin->p_key)) {
-            if(p_prev) {
-                p_prev->p_next = p_bin->p_next;
-            }
-            else {
-                inp_self->p_bins[bin] = p_bin->p_next;
-            }
-            hashmap_bin_free(p_bin, inp_self->p_bin_void_free_fn);
-            return;
-        }
-        p_prev = p_bin;
-        p_bin = p_bin->p_next;
-    }
-    return;
+	uint32_t hash = hash_func(inp_key, strlen(inp_key));
+	int bin = hash & inp_self->bin_mask;
+	hashmap_bin_pt p_prev = NULL, p_bin = inp_self->p_bins[bin];
+	while(p_bin) {
+		if(p_bin->hash == hash && !strcmp(inp_key, p_bin->p_key)) {
+			if(p_prev) {
+				p_prev->p_next = p_bin->p_next;
+			}
+			else {
+				inp_self->p_bins[bin] = p_bin->p_next;
+			}
+			hashmap_bin_free(p_bin, inp_self->p_bin_void_free_fn);
+			inp_self->num_of_entries--;
+			return;
+		}
+		p_prev = p_bin;
+	p_bin = p_bin->p_next;
+	}
+	return;
+}
+
+size_t
+hashmap_count(hashmap_pt inp_self)
+{
+	return inp_self->num_of_entries;
 }
   
 static inline uint32_t
 hash_func(const char *inp_key, uint32_t in_len)
 {
-    register uint32_t hash = 5381;
-    /* variant with the hash unrolled eight times */
-    for (; in_len >= 8; in_len -= 8) {
-        hash = ((hash << 5) + hash) + *inp_key++;
-        hash = ((hash << 5) + hash) + *inp_key++;
-        hash = ((hash << 5) + hash) + *inp_key++;
-        hash = ((hash << 5) + hash) + *inp_key++;
-        hash = ((hash << 5) + hash) + *inp_key++;
-        hash = ((hash << 5) + hash) + *inp_key++;
-        hash = ((hash << 5) + hash) + *inp_key++;
-        hash = ((hash << 5) + hash) + *inp_key++;
-    }
-    switch (in_len) {
-        case 7: hash = ((hash << 5) + hash) + *inp_key++; /* fallthrough... */
-        case 6: hash = ((hash << 5) + hash) + *inp_key++; /* fallthrough... */
-        case 5: hash = ((hash << 5) + hash) + *inp_key++; /* fallthrough... */
-        case 4: hash = ((hash << 5) + hash) + *inp_key++; /* fallthrough... */
-        case 3: hash = ((hash << 5) + hash) + *inp_key++; /* fallthrough... */
-        case 2: hash = ((hash << 5) + hash) + *inp_key++; /* fallthrough... */
-        case 1: hash = ((hash << 5) + hash) + *inp_key++; break;
-        case 0: default: break;
-    }
-    return hash;
+	register uint32_t hash = 5381;
+	/* variant with the hash unrolled eight times */
+	for (; in_len >= 8; in_len -= 8) {
+		hash = ((hash << 5) + hash) + *inp_key++;
+		hash = ((hash << 5) + hash) + *inp_key++;
+		hash = ((hash << 5) + hash) + *inp_key++;
+		hash = ((hash << 5) + hash) + *inp_key++;
+		hash = ((hash << 5) + hash) + *inp_key++;
+		hash = ((hash << 5) + hash) + *inp_key++;
+		hash = ((hash << 5) + hash) + *inp_key++;
+		hash = ((hash << 5) + hash) + *inp_key++;
+	}
+	switch (in_len) {
+		case 7: hash = ((hash << 5) + hash) + *inp_key++; /* fallthrough... */
+		case 6: hash = ((hash << 5) + hash) + *inp_key++; /* fallthrough... */
+		case 5: hash = ((hash << 5) + hash) + *inp_key++; /* fallthrough... */
+		case 4: hash = ((hash << 5) + hash) + *inp_key++; /* fallthrough... */
+		case 3: hash = ((hash << 5) + hash) + *inp_key++; /* fallthrough... */
+		case 2: hash = ((hash << 5) + hash) + *inp_key++; /* fallthrough... */
+		case 1: hash = ((hash << 5) + hash) + *inp_key++; break;
+		case 0: default: break;
+	}
+	return hash;
 }
+
+#ifdef __cplusplus
+}
+#endif
 

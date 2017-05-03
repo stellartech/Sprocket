@@ -10,6 +10,8 @@ SET(CMAKE_LIBRARY_PATH ${CMAKE_LIBRARY_PATH}
 SET(sprocket_SRCS
 	ws_ht_parser.c
 	hashmap.c
+	base64.c
+	llist.c
 )
   
 ADD_LIBRARY(sprocket
@@ -23,5 +25,6 @@ SET_TARGET_PROPERTIES(${PROJECT_NAME} PROPERTIES ARCHIVE_OUTPUT_DIRECTORY ${PROJ
 TARGET_LINK_LIBRARIES(sprocket
 	jansson
 	http_parser
+	ssl
 )
   

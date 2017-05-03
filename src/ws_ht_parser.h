@@ -5,6 +5,10 @@
 
 #include <jansson.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  *
  * @param in_buffer The received data buffer
@@ -24,5 +28,9 @@ htparse_websocket_upgrade_request(
 	int in_check_hdrs,
 	int in_force_headers_lowerase
 );
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* WS_HT_PARSE_H_INCLUDED */
