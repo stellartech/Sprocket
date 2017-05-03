@@ -12,6 +12,7 @@ SET(sprocket_SRCS
 	hashmap.c
 	base64.c
 	llist.c
+	queue.c
 )
   
 ADD_LIBRARY(sprocket

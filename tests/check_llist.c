@@ -25,6 +25,7 @@
 
 #include "../src/llist.h"
 
+#define NUM_OF_ELES 4
 
 llist_pt p = NULL;
 
@@ -33,43 +34,70 @@ void setup(void)
 	char *s1 = strdup("element1");
 	char *s2 = strdup("element2");
 	char *s3 = strdup("element3");
+	char *s4 = strdup("element4");
 	p = llist_ctor(free);
-	LLIST_IF(p)->insert(p, "idx1", s1);
-	LLIST_IF(p)->insert(p, "idx2", s2);
-	LLIST_IF(p)->insert(p, "idx3", s3);
+	ck_assert_int_eq(1, LLIST_IF(p)->insert(p, "idx1", s1));
+	ck_assert_int_eq(1, LLIST_IF(p)->insert(p, "idx2", s2));
+	ck_assert_int_eq(1, LLIST_IF(p)->insertl(p, LLIST_CONST_KEY("idx3"), s3));
+	ck_assert_int_eq(1, LLIST_IF(p)->insertl(p, LLIST_CONST_KEY("idx4"), s4));
 }
 
 void teardown(void)
 {
 	LLIST_IF(p)->dtor(&p);
+	ck_assert(p == NULL);
 }
+
+START_TEST(test_llist_exists)
+{
+	ck_assert_int_eq(LLIST_IF(p)->count(p), NUM_OF_ELES);
+	ck_assert_int_eq(0, LLIST_IF(p)->exists(p, "foo"));
+	ck_assert_int_ne(0, LLIST_IF(p)->exists(p, "idx1"));
+	ck_assert_int_ne(0, LLIST_IF(p)->exists(p, "idx2"));
+	ck_assert_int_ne(0, LLIST_IF(p)->exists(p, "idx3"));
+	ck_assert_int_ne(0, LLIST_IF(p)->exists(p, "idx4"));
+}
+END_TEST
+
+START_TEST(test_llist_existsl)
+{
+	ck_assert_int_eq(LLIST_IF(p)->count(p), NUM_OF_ELES);
+	ck_assert_int_eq(0, LLIST_IF(p)->existsl(p, LLIST_CONST_KEY("foo")));
+	ck_assert_int_ne(0, LLIST_IF(p)->existsl(p, LLIST_CONST_KEY("idx1")));
+	ck_assert_int_ne(0, LLIST_IF(p)->existsl(p, LLIST_CONST_KEY("idx2")));
+	ck_assert_int_ne(0, LLIST_IF(p)->existsl(p, LLIST_CONST_KEY("idx3")));
+	ck_assert_int_ne(0, LLIST_IF(p)->existsl(p, LLIST_CONST_KEY("idx4")));
+}
+END_TEST
 
 START_TEST(test_llist_find)
 {
-	ck_assert_int_eq(LLIST_IF(p)->count(p), 3);
+	ck_assert_int_eq(LLIST_IF(p)->count(p), NUM_OF_ELES);
 	ck_assert(LLIST_IF(p)->find(p, "foo") == NULL);
 	ck_assert_str_eq("element1", LLIST_IF(p)->find(p, "idx1"));
 	ck_assert_str_eq("element2", LLIST_IF(p)->find(p, "idx2"));
 	ck_assert_str_eq("element3", LLIST_IF(p)->find(p, "idx3"));
+	ck_assert_str_eq("element4", LLIST_IF(p)->find(p, "idx4"));
 }
 END_TEST
 
 START_TEST(test_llist_findl)
 {
-	ck_assert_int_eq(LLIST_IF(p)->count(p), 3);
+	ck_assert_int_eq(LLIST_IF(p)->count(p), NUM_OF_ELES);
 	ck_assert(LLIST_IF(p)->findl(p, LLIST_CONST_KEY("foo")) == NULL);
 	ck_assert_str_eq("element1", LLIST_IF(p)->findl(p, LLIST_CONST_KEY("idx1")));
 	ck_assert_str_eq("element2", LLIST_IF(p)->findl(p, LLIST_CONST_KEY("idx2")));
 	ck_assert_str_eq("element3", LLIST_IF(p)->findl(p, LLIST_CONST_KEY("idx3")));
+	ck_assert_str_eq("element4", LLIST_IF(p)->findl(p, LLIST_CONST_KEY("idx4")));
 }
 END_TEST
 
 START_TEST(test_llist_remove__top)
 {
 	char *removed;
-	ck_assert_int_eq(LLIST_IF(p)->count(p), 3);
+	ck_assert_int_eq(LLIST_IF(p)->count(p), NUM_OF_ELES);
 	removed = LLIST_IF(p)->remove(p, "idx1");
-	ck_assert_int_eq(LLIST_IF(p)->count(p), 2);
+	ck_assert_int_eq(LLIST_IF(p)->count(p), NUM_OF_ELES-1);
 	ck_assert_str_eq("element1", removed);
 	free(removed);
 }
@@ -78,9 +106,9 @@ END_TEST
 START_TEST(test_llist_remove__mid)
 {
 	char *removed;
-	ck_assert_int_eq(LLIST_IF(p)->count(p), 3);
+	ck_assert_int_eq(LLIST_IF(p)->count(p), NUM_OF_ELES);
 	removed = LLIST_IF(p)->remove(p, "idx2");
-	ck_assert_int_eq(LLIST_IF(p)->count(p), 2);
+	ck_assert_int_eq(LLIST_IF(p)->count(p), NUM_OF_ELES-1);
 	ck_assert_str_eq("element2", removed);
 	free(removed);
 }
@@ -89,10 +117,10 @@ END_TEST
 START_TEST(test_llist_remove__bot)
 {
 	char *removed;
-	ck_assert_int_eq(LLIST_IF(p)->count(p), 3);
-	removed = LLIST_IF(p)->remove(p, "idx3");
-	ck_assert_int_eq(LLIST_IF(p)->count(p), 2);
-	ck_assert_str_eq("element3", removed);
+	ck_assert_int_eq(LLIST_IF(p)->count(p), NUM_OF_ELES);
+	removed = LLIST_IF(p)->remove(p, "idx4");
+	ck_assert_int_eq(LLIST_IF(p)->count(p), NUM_OF_ELES-1);
+	ck_assert_str_eq("element4", removed);
 	free(removed);
 }
 END_TEST
@@ -100,9 +128,9 @@ END_TEST
 START_TEST(test_llist_removel__top)
 {
 	char *removed;
-	ck_assert_int_eq(LLIST_IF(p)->count(p), 3);
+	ck_assert_int_eq(LLIST_IF(p)->count(p), NUM_OF_ELES);
 	removed = LLIST_IF(p)->removel(p, LLIST_CONST_KEY("idx1"));
-	ck_assert_int_eq(LLIST_IF(p)->count(p), 2);
+	ck_assert_int_eq(LLIST_IF(p)->count(p), NUM_OF_ELES-1);
 	ck_assert_str_eq("element1", removed);
 	free(removed);
 }
@@ -111,9 +139,9 @@ END_TEST
 START_TEST(test_llist_removel__mid)
 {
 	char *removed;
-	ck_assert_int_eq(LLIST_IF(p)->count(p), 3);
+	ck_assert_int_eq(LLIST_IF(p)->count(p), NUM_OF_ELES);
 	removed = LLIST_IF(p)->removel(p, LLIST_CONST_KEY("idx2"));
-	ck_assert_int_eq(LLIST_IF(p)->count(p), 2);
+	ck_assert_int_eq(LLIST_IF(p)->count(p), NUM_OF_ELES-1);
 	ck_assert_str_eq("element2", removed);
 	free(removed);
 }
@@ -122,59 +150,59 @@ END_TEST
 START_TEST(test_llist_removel__bot)
 {
 	char *removed;
-	ck_assert_int_eq(LLIST_IF(p)->count(p), 3);
-	removed = LLIST_IF(p)->removel(p, LLIST_CONST_KEY("idx3"));
-	ck_assert_int_eq(LLIST_IF(p)->count(p), 2);
-	ck_assert_str_eq("element3", removed);
+	ck_assert_int_eq(LLIST_IF(p)->count(p), NUM_OF_ELES);
+	removed = LLIST_IF(p)->removel(p, LLIST_CONST_KEY("idx4"));
+	ck_assert_int_eq(LLIST_IF(p)->count(p), NUM_OF_ELES-1);
+	ck_assert_str_eq("element4", removed);
 	free(removed);
 }
 END_TEST
 
 START_TEST(test_llist_delete__top)
 {
-	ck_assert_int_eq(LLIST_IF(p)->count(p), 3);
+	ck_assert_int_eq(LLIST_IF(p)->count(p), NUM_OF_ELES);
 	LLIST_IF(p)->delete(p, "idx1");
-	ck_assert_int_eq(LLIST_IF(p)->count(p), 2);
+	ck_assert_int_eq(LLIST_IF(p)->count(p), NUM_OF_ELES-1);
 }
 END_TEST
 
 START_TEST(test_llist_delete__mid)
 {
-	ck_assert_int_eq(LLIST_IF(p)->count(p), 3);
+	ck_assert_int_eq(LLIST_IF(p)->count(p), NUM_OF_ELES);
 	LLIST_IF(p)->delete(p, "idx2");
-	ck_assert_int_eq(LLIST_IF(p)->count(p), 2);
+	ck_assert_int_eq(LLIST_IF(p)->count(p), NUM_OF_ELES-1);
 }
 END_TEST
 
 START_TEST(test_llist_delete__bot)
 {
-	ck_assert_int_eq(LLIST_IF(p)->count(p), 3);
-	LLIST_IF(p)->delete(p, "idx3");
-	ck_assert_int_eq(LLIST_IF(p)->count(p), 2);
+	ck_assert_int_eq(LLIST_IF(p)->count(p), NUM_OF_ELES);
+	LLIST_IF(p)->delete(p, "idx4");
+	ck_assert_int_eq(LLIST_IF(p)->count(p), NUM_OF_ELES-1);
 }
 END_TEST
 
 START_TEST(test_llist_deletel__top)
 {
-	ck_assert_int_eq(LLIST_IF(p)->count(p), 3);
+	ck_assert_int_eq(LLIST_IF(p)->count(p), NUM_OF_ELES);
 	LLIST_IF(p)->deletel(p, LLIST_CONST_KEY("idx1"));
-	ck_assert_int_eq(LLIST_IF(p)->count(p), 2);
+	ck_assert_int_eq(LLIST_IF(p)->count(p), NUM_OF_ELES-1);
 }
 END_TEST
 
 START_TEST(test_llist_deletel__mid)
 {
-	ck_assert_int_eq(LLIST_IF(p)->count(p), 3);
+	ck_assert_int_eq(LLIST_IF(p)->count(p), NUM_OF_ELES);
 	LLIST_IF(p)->deletel(p, LLIST_CONST_KEY("idx2"));
-	ck_assert_int_eq(LLIST_IF(p)->count(p), 2);
+	ck_assert_int_eq(LLIST_IF(p)->count(p), NUM_OF_ELES-1);
 }
 END_TEST
 
 START_TEST(test_llist_deletel__bot)
 {
-	ck_assert_int_eq(LLIST_IF(p)->count(p), 3);
-	LLIST_IF(p)->deletel(p, LLIST_CONST_KEY("idx3"));
-	ck_assert_int_eq(LLIST_IF(p)->count(p), 2);
+	ck_assert_int_eq(LLIST_IF(p)->count(p), NUM_OF_ELES);
+	LLIST_IF(p)->deletel(p, LLIST_CONST_KEY("idx4"));
+	ck_assert_int_eq(LLIST_IF(p)->count(p), NUM_OF_ELES-1);
 }
 END_TEST
 
@@ -187,6 +215,8 @@ Suite *suite()
 
 	tc_core = tcase_create("Core");
 	tcase_add_checked_fixture(tc_core, setup, teardown);
+	tcase_add_test(tc_core, test_llist_exists);
+	tcase_add_test(tc_core, test_llist_existsl);
 	tcase_add_test(tc_core, test_llist_find);
 	tcase_add_test(tc_core, test_llist_findl);
 	tcase_add_test(tc_core, test_llist_remove__top);

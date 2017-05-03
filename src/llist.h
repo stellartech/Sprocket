@@ -78,6 +78,7 @@ llist_pt
 llist_set_if(llist_pt inp_self, llist_pif inp_if);
   
 #define LLIST_IF(x) llist_get_if(x)
+#define LLSIT(x,y,...) llist_get_if(x)->y(x...)
   
 llist_pt
 llist_ctor(llist_void_free_fn in_free_fn);
