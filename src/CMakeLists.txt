@@ -3,12 +3,13 @@ CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
   
 SET(FIND_LIBRARY_USE_LIB64_PATHS 1)
 SET(CMAKE_LIBRARY_PATH ${CMAKE_LIBRARY_PATH}
-    /usr/local/lib
-    /usr/lib
+	/usr/local/lib
+	/usr/lib
 )
   
 SET(sprocket_SRCS
-    ws_ht_parser.c
+	ws_ht_parser.c
+	hashmap.c
 )
   
 ADD_LIBRARY(sprocket
