@@ -50,6 +50,7 @@ void setup(void)
 
 	p_item = queue_item_ctor(1, s4, strlen(s4), free);
 	queue_push_back(q, p_item);
+
 }
 
 void teardown(void)
