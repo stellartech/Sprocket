@@ -9,10 +9,12 @@ SET(CMAKE_LIBRARY_PATH ${CMAKE_LIBRARY_PATH}
   
 SET(sprocket_SRCS
 	ws_ht_parser.c
+	ws_magic.c
 	hashmap.c
 	base64.c
 	llist.c
 	queue.c
+	sha1.c
 )
   
 ADD_LIBRARY(sprocket
@@ -27,5 +29,6 @@ TARGET_LINK_LIBRARIES(sprocket
 	jansson
 	http_parser
 	ssl
+	crypto
 )
   

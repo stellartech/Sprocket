@@ -19,5 +19,7 @@ IF(RUN_TESTS)
 	ADD_SPROCKET_TEST(check_llist)
 	ADD_SPROCKET_TEST(check_queue)
 	ADD_SPROCKET_TEST(check_base64)
+	#ADD_SPROCKET_TEST(check_sha1)
+	ADD_SPROCKET_TEST(check_ws_magic)
 ENDIF()
 
