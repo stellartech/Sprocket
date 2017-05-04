@@ -15,7 +15,8 @@ SET(sprocket_SRCS
 	llist.c
 	queue.c
 	#sha1.c
-	tcp_listener.c
+	#tcp_listener.c
+	thd_worker.c
 )
   
 ADD_LIBRARY(sprocket
