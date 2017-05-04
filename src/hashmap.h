@@ -35,6 +35,10 @@ void
 hashmap_dtor(hashmap_pt *inpp);
   
 void*
+hashmap_findl(hashmap_pt inp_self, 
+	const char *inp_key, int in_key_len);
+
+void*
 hashmap_find(hashmap_pt inp_self,
         const char *inp_key);
   
@@ -46,7 +50,7 @@ void*
 hashmap_remove(hashmap_pt inp_self,
         const char *inp_key);
   
-void
+int
 hashmap_delete(hashmap_pt inp_self, const char *inp_key);
   
 #ifdef __cplusplus
