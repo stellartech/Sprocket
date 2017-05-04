@@ -70,6 +70,9 @@ thd_wkr_queue_pop_blocking(thd_wkr_queue_pt inp_self);
 int
 thd_wkr_queue_size(thd_wkr_queue_pt inp_self);
 
+size_t
+thd_wkr_queue_sizeof(void);
+
 //////
 
 struct _thd_wkr;
@@ -84,6 +87,9 @@ thd_wkr_free(thd_wkr_pt inp_self);
 
 void
 thd_wkr_dtor(thd_wkr_pt *inpp_self);
+
+size_t
+thd_wkr_sizeof(void);
 
 #ifdef __cplusplus
 }

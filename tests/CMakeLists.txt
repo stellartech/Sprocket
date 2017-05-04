@@ -22,5 +22,7 @@ IF(RUN_TESTS)
 	ADD_SPROCKET_TEST(check_ws_magic)
 	ADD_SPROCKET_TEST(check_thd_wkr_queue)
 	ADD_SPROCKET_TEST(check_thd_wkr)
+	#ADD_SPROCKET_TEST(check_thd_pool)
+	ADD_SPROCKET_TEST(check_th_pool)
 ENDIF()
 

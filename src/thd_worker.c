@@ -192,6 +192,12 @@ thd_wkr_queue_size(thd_wkr_queue_pt inp_self)
 	return inp_self ? inp_self->counter : -1;
 }
 
+size_t
+thd_wkr_queue_sizeof(void)
+{
+	return sizeof(thd_wkr_queue_t);
+}
+
 //////
 
 #include <sched.h>
@@ -291,6 +297,12 @@ thd_wkr_dtor(thd_wkr_pt *inpp_self)
 		thd_wkr_free(*inpp_self);
 		*inpp_self = NULL;
 	}
+}
+
+size_t
+thd_wkr_sizeof(void)
+{
+	return (size_t)sizeof(thd_wkr_t);
 }
 
 #ifdef __cplusplus

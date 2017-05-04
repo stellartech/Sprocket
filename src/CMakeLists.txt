@@ -15,6 +15,8 @@ SET(sprocket_SRCS
 	llist.c
 	queue.c
 	thd_worker.c
+	thd_pool.c
+	thpool.c
 )
   
 ADD_LIBRARY(sprocket
