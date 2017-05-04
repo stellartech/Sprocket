@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <pthread.h>
   
 #include "hashmap.h"
   
@@ -32,34 +33,43 @@ struct _hashmap
 	int                   bin_mask;
 	hashmap_void_free_fn  p_bin_void_free_fn;
 	hashmap_bin_ppt       p_bins;
+	pthread_mutex_t       lock;
 };
   
 hashmap_pt
 hashmap_ctor(int in_num_bins, hashmap_void_free_fn in_free_fn)
 {
-    hashmap_pt p_self = (hashmap_pt)calloc(1, sizeof(hashmap_t));
-    if(p_self) {
-        int i = 3;
-        p_self->num_of_bins = in_num_bins;
-        if(in_num_bins >= 0x80000000) {
-            p_self->num_of_bins = 0x80000000;
-        }
-        else {
-            while((1U << i) < in_num_bins) {
-                ++i;
-            }
-            p_self->num_of_bins = 1 << i;
-        }
-        p_self->bin_mask = p_self->num_of_bins - 1;
-        p_self->p_bin_void_free_fn = in_free_fn;
-        p_self->p_bins = (hashmap_bin_ppt)calloc(p_self->num_of_bins,
-                sizeof(hashmap_bin_ppt));
-        if(!p_self->p_bins) {
-            free(p_self);
-            return NULL;
-        }
-    }
-    return p_self;
+	hashmap_pt p_self = (hashmap_pt)calloc(1, sizeof(hashmap_t));
+	if(p_self) {
+		int i = 3;
+		p_self->num_of_bins = in_num_bins;
+		if(in_num_bins >= 0x80000000) {
+			p_self->num_of_bins = 0x80000000;
+		}
+		else {
+			while((1U << i) < in_num_bins) {
+				++i;
+			}
+			p_self->num_of_bins = 1 << i;
+		}
+		p_self->bin_mask = p_self->num_of_bins - 1;
+		p_self->p_bin_void_free_fn = in_free_fn;
+		p_self->p_bins = (hashmap_bin_ppt)calloc(p_self->num_of_bins,
+		sizeof(hashmap_bin_ppt));
+		if(!p_self->p_bins) {
+			goto hashmap_ctor_fail;
+		}
+		if(pthread_mutex_init(&p_self->lock, NULL) != 0) {
+			goto hashmap_ctor_fail;
+		}
+	}
+	return p_self;
+
+hashmap_ctor_fail:
+	if(p_self) {
+		hashmap_dtor(&p_self);
+	}
+	return NULL;
 }
   
 static hashmap_bin_pt
@@ -91,6 +101,7 @@ hashmap_free(hashmap_pt inp_self)
                         inp_self->p_bin_void_free_fn);
             }
         }
+	pthread_mutex_destroy(&inp_self->lock);
         free(inp_self->p_bins);
         free(inp_self);
     }
@@ -109,25 +120,38 @@ hashmap_dtor(hashmap_pt *inpp)
 void*
 hashmap_find(hashmap_pt inp_self, const char *inp_key)
 {
-    uint32_t hash = hash_func(inp_key, strlen(inp_key));
-    int bin = hash & inp_self->bin_mask;
-    hashmap_bin_pt p_bin = (hashmap_bin_pt)inp_self->p_bins[bin];
-    while(p_bin) {
-        if(p_bin->hash == hash && !strcmp(inp_key, p_bin->p_key)) {
-            return p_bin->p_value;
-        }
-        p_bin = p_bin->p_next;
-    }
-    return NULL;
+	int bin;
+	uint32_t hash;
+	if(pthread_mutex_lock(&inp_self->lock) != 0) {
+		return NULL;
+	}
+	hash = hash_func(inp_key, strlen(inp_key));
+	bin = hash & inp_self->bin_mask;
+	hashmap_bin_pt p_bin = (hashmap_bin_pt)inp_self->p_bins[bin];
+	while(p_bin) {
+		if(p_bin->hash == hash && !strcmp(inp_key, p_bin->p_key)) {
+			pthread_mutex_unlock(&inp_self->lock);
+			return p_bin->p_value;
+		}
+		p_bin = p_bin->p_next;
+	}
+	pthread_mutex_unlock(&inp_self->lock);
+	return NULL;
 }
   
 int
 hashmap_insert(hashmap_pt inp_self, const char *inp_key, void *inp_val)
 {
-	uint32_t hash = hash_func(inp_key, strlen(inp_key));
-	int bin = hash & inp_self->bin_mask;
+	int bin;
+	uint32_t hash;
+	if(pthread_mutex_lock(&inp_self->lock) != 0) {
+		return -1;
+	}
+	hash = hash_func(inp_key, strlen(inp_key));
+	bin = hash & inp_self->bin_mask;
 	hashmap_bin_pt p_bin = calloc(1, sizeof(hashmap_bin_t));
 	if(!p_bin) {
+		pthread_mutex_unlock(&inp_self->lock);
 		return -1;
 	}
 	p_bin->hash = hash;
@@ -141,15 +165,22 @@ hashmap_insert(hashmap_pt inp_self, const char *inp_key, void *inp_val)
 		inp_self->p_bins[bin] = p_bin;
 	}
 	inp_self->num_of_entries++;
+	pthread_mutex_unlock(&inp_self->lock);
 	return 0;
 }
   
 void*
 hashmap_remove(hashmap_pt inp_self, const char *inp_key)
 {
+	int bin;
+	uint32_t hash;
 	void *p_rval = NULL;
-	uint32_t hash = hash_func(inp_key, strlen(inp_key));
-	int bin = hash & inp_self->bin_mask;
+	if(pthread_mutex_lock(&inp_self->lock) != 0) {
+		return NULL;
+	}
+	p_rval = NULL;
+	hash = hash_func(inp_key, strlen(inp_key));
+	bin = hash & inp_self->bin_mask;
 	hashmap_bin_pt p_prev = NULL, p_bin = inp_self->p_bins[bin];
 	while(p_bin) {
 		if(p_bin->hash == hash && !strcmp(inp_key, p_bin->p_key)) {
@@ -162,19 +193,26 @@ hashmap_remove(hashmap_pt inp_self, const char *inp_key)
 			inp_self->num_of_entries--;
 			p_rval = p_bin->p_value;
 			hashmap_bin_free(p_bin, NULL);
+			pthread_mutex_unlock(&inp_self->lock);
 			return p_rval;
 		}
 		p_prev = p_bin;
 		p_bin = p_bin->p_next;
 	}
-	return p_rval;;
+	pthread_mutex_unlock(&inp_self->lock);
+	return p_rval;
 }
   
 void
 hashmap_delete(hashmap_pt inp_self, const char *inp_key)
 {
-	uint32_t hash = hash_func(inp_key, strlen(inp_key));
-	int bin = hash & inp_self->bin_mask;
+	int bin;
+	uint32_t hash;
+	if(pthread_mutex_lock(&inp_self->lock) != 0) {
+		return;
+	}
+	hash = hash_func(inp_key, strlen(inp_key));
+	bin = hash & inp_self->bin_mask;
 	hashmap_bin_pt p_prev = NULL, p_bin = inp_self->p_bins[bin];
 	while(p_bin) {
 		if(p_bin->hash == hash && !strcmp(inp_key, p_bin->p_key)) {
@@ -186,18 +224,25 @@ hashmap_delete(hashmap_pt inp_self, const char *inp_key)
 			}
 			hashmap_bin_free(p_bin, inp_self->p_bin_void_free_fn);
 			inp_self->num_of_entries--;
+			pthread_mutex_unlock(&inp_self->lock);
 			return;
 		}
 		p_prev = p_bin;
-	p_bin = p_bin->p_next;
+		p_bin = p_bin->p_next;
 	}
-	return;
+	pthread_mutex_unlock(&inp_self->lock);
 }
 
 size_t
 hashmap_count(hashmap_pt inp_self)
 {
-	return inp_self->num_of_entries;
+	size_t rval;
+	if(pthread_mutex_lock(&inp_self->lock) != 0) {
+		return -1;
+	}
+	rval = inp_self->num_of_entries;
+	pthread_mutex_unlock(&inp_self->lock);
+	return rval;
 }
   
 static inline uint32_t
