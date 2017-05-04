@@ -25,11 +25,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
-#include <openssl/sha.h>
 
 #include "../src/base64.h"
 #include "../src/ws_magic.h"
-
 
 static uint8_t accept_string[] = "dGhlIHNhbXBsZSBub25jZQ==";
 static uint8_t response_string[] = "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=";
@@ -47,37 +45,48 @@ void teardown(void)
 {
 }
 
-/*
-unsigned char*
-make_websocket_accept_response_sha1(const char* inp_keystr, unsigned char *outp_sha1buf);
-*/
-
-
-START_TEST(test_ws_magic__make_websocket_accept_response_sha1)
-{
-	int i;
-	const unsigned char *ws_accept_response;
-	unsigned char sha1[SHA_DIGEST_LENGTH];
-	ws_accept_response = make_websocket_accept_response_sha1(accept_string, sha1);
-	for(i = 0; i < SHA_DIGEST_LENGTH; i++) {
-		ck_assert_int_eq(sha1_string[i], ws_accept_response[i]);
-	}
-}
-END_TEST
-
 START_TEST(test_ws_magic__make_websocket_accept_response)
 {
 	int i;
 	char *p_base64;
 	const unsigned char *ws_accept_response;
-	unsigned char sha1[SHA_DIGEST_LENGTH];
-	ws_accept_response = make_websocket_accept_response_sha1(accept_string, sha1);
-	p_base64 = base64_encode(ws_accept_response, SHA_DIGEST_LENGTH, NULL);
-	ck_assert_str_eq(p_base64, response_string);
-	free(p_base64);
-	
+	ws_accept_response = make_websocket_accept_response(accept_string);
+	ck_assert_str_eq(ws_accept_response, response_string);
+	free((void*)ws_accept_response);
 }
 END_TEST
+
+static const char
+expect_magic_http_response1[] =
+        "HTTP/1.1 101 Switching Protocols\r\n"
+        "Upgrade: websocket\r\n"
+        "Connection: Upgrade\r\n"
+        "Sec-WebSocket-Accept: foo\r\n\r\n";
+
+START_TEST(test_ws_magic__make_websocket_magic_response_1)
+{
+	char *p_response = make_websocket_magic_response("foo", NULL, NULL);
+	ck_assert_str_eq(p_response, expect_magic_http_response1);
+	free(p_response);
+}
+END_TEST
+
+static const char
+expect_magic_http_response2[] =
+        "HTTP/1.1 101 Switching Protocols\r\n"
+        "Upgrade: websocket\r\n"
+        "Connection: Upgrade\r\n"
+        "Sec-WebSocket-Accept: foo\r\n"
+	"Sec-WebSocket-Protocol: bar\r\n\r\n";
+
+START_TEST(test_ws_magic__make_websocket_magic_response_2)
+{
+	char *p_response = make_websocket_magic_response("foo", "bar", NULL);
+	ck_assert_str_eq(p_response, expect_magic_http_response2);
+	free(p_response);
+}
+END_TEST
+
 
 Suite *suite()
 {
@@ -88,8 +97,9 @@ Suite *suite()
 
 	tc_core = tcase_create("Core");
 	tcase_add_checked_fixture(tc_core, setup, teardown);
-	tcase_add_test(tc_core, test_ws_magic__make_websocket_accept_response_sha1);
 	tcase_add_test(tc_core, test_ws_magic__make_websocket_accept_response);
+	tcase_add_test(tc_core, test_ws_magic__make_websocket_magic_response_1);
+	tcase_add_test(tc_core, test_ws_magic__make_websocket_magic_response_2);
 	suite_add_tcase(s, tc_core);
 
 	return s;

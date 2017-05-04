@@ -11,8 +11,8 @@ extern "C" {
 /**
  * @param outp_sha1buf Must be SHA_DIGEST_LENGTH in len.
  */
-unsigned char*
-make_websocket_accept_response_sha1(const char* inp_keystr, unsigned char *outp_sha1buf);
+//unsigned char*
+//make_websocket_accept_response_sha1(const char* inp_keystr, unsigned char *outp_sha1buf);
 
 const char*
 make_websocket_accept_response(const char* inp_keystr);

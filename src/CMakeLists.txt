@@ -14,7 +14,8 @@ SET(sprocket_SRCS
 	base64.c
 	llist.c
 	queue.c
-	sha1.c
+	#sha1.c
+	tcp_listener.c
 )
   
 ADD_LIBRARY(sprocket
@@ -30,5 +31,9 @@ TARGET_LINK_LIBRARIES(sprocket
 	http_parser
 	ssl
 	crypto
+	event
+	event_extra
+	event_openssl
+	event_pthreads
 )
   
