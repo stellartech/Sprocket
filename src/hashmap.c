@@ -55,7 +55,7 @@ hashmap_ctor(int in_num_bins, hashmap_void_free_fn in_free_fn)
 		p_self->bin_mask = p_self->num_of_bins - 1;
 		p_self->p_bin_void_free_fn = in_free_fn;
 		p_self->p_bins = (hashmap_bin_ppt)calloc(p_self->num_of_bins,
-		sizeof(hashmap_bin_ppt));
+			sizeof(hashmap_bin_ppt));
 		if(!p_self->p_bins) {
 			goto hashmap_ctor_fail;
 		}
