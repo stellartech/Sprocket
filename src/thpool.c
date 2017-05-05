@@ -8,6 +8,11 @@
  *
  ********************************/
 
+/*
+ * Modified by Andy Kirkham to add per thread user resource callbacks
+ */
+
+
 #define _POSIX_C_SOURCE 200809L
 #include <unistd.h>
 #include <signal.h>
