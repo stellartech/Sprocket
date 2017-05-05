@@ -36,6 +36,20 @@ typedef struct thpool_* threadpool;
  */
 threadpool thpool_init(int num_threads);
 
+/**
+ * As above but allows for each thread to have a user supllied set of resources.
+ * At thread create time the resource_cb() is called to acquire per thread resources.
+ * 
+ * @param  num_threads   number of threads to be created in the threadpool
+ * @param  resource_cb   the user callback function to invoke foreach thread.
+ * @param  resource_free the free function to use for per thread user resources
+ * @return threadpool    created threadpool on success,
+ *                       NULL on error 
+ */
+typedef void* (*thpool_init_resource_cb)(void*);
+typedef void  (*thpool_init_resource_cb_free)(void*);
+threadpool thpool_init_ex(int num_threads, thpool_init_resource_cb resource_cb, void* resource_cb_arg, thpool_init_resource_cb_free resource_free);
+
 
 /**
  * @brief Add work to the job queue
@@ -65,6 +79,7 @@ threadpool thpool_init(int num_threads);
  * @return 0 on successs, -1 otherwise.
  */
 int thpool_add_work(threadpool, void (*function_p)(void*), void* arg_p);
+int thpool_add_work_ex(threadpool, void (*function_p)(void*,void*), void* arg_p);
 
 
 /**

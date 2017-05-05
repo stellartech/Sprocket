@@ -53,7 +53,8 @@ typedef struct bsem {
 /* Job */
 typedef struct job{
 	struct job*  prev;                   /* pointer to previous job   */
-	void   (*function)(void* arg);       /* function pointer          */
+	void   (*function)(void*);           /* function pointer          */
+	void   (*function_ex)(void*,void*);  /* function pointer ex       */
 	void*  arg;                          /* function's argument       */
 } job;
 
@@ -73,6 +74,7 @@ typedef struct thread{
 	int       id;                        /* friendly id               */
 	pthread_t pthread;                   /* pointer to actual thread  */
 	struct thpool_* thpool_p;            /* access to thpool          */
+	void* user_resources;                /* user resources            */
 } thread;
 
 
@@ -84,10 +86,8 @@ typedef struct thpool_{
 	pthread_mutex_t  thcount_lock;       /* used for thread count etc */
 	pthread_cond_t  threads_all_idle;    /* signal to thpool_wait     */
 	jobqueue  jobqueue;                  /* job queue                 */
+	thpool_init_resource_cb_free user_resources_free;
 } thpool_;
-
-
-
 
 
 /* ========================== PROTOTYPES ============================ */
@@ -109,8 +109,6 @@ static void  bsem_reset(struct bsem *bsem_p);
 static void  bsem_post(struct bsem *bsem_p);
 static void  bsem_post_all(struct bsem *bsem_p);
 static void  bsem_wait(struct bsem *bsem_p);
-
-
 
 
 
@@ -171,6 +169,63 @@ struct thpool_* thpool_init(int num_threads){
 	return thpool_p;
 }
 
+//typedef void* (thpool_init_resource_cb)(void);
+
+struct thpool_* thpool_init_ex(int num_threads, thpool_init_resource_cb resource_cb, void* resource_cb_arg, thpool_init_resource_cb_free resource_free){
+
+	threads_on_hold   = 0;
+	threads_keepalive = 1;
+
+	if (num_threads < 0){
+		num_threads = 0;
+	}
+
+	/* Make new thread pool */
+	thpool_* thpool_p;
+	thpool_p = (struct thpool_*)malloc(sizeof(struct thpool_));
+	if (thpool_p == NULL){
+		err("thpool_init(): Could not allocate memory for thread pool\n");
+		return NULL;
+	}
+	thpool_p->num_threads_alive   = 0;
+	thpool_p->num_threads_working = 0;
+	thpool_p->user_resources_free = resource_free ? resource_free : NULL;
+
+	/* Initialise the job queue */
+	if (jobqueue_init(&thpool_p->jobqueue) == -1){
+		err("thpool_init(): Could not allocate memory for job queue\n");
+		free(thpool_p);
+		return NULL;
+	}
+
+	/* Make threads in pool */
+	thpool_p->threads = (struct thread**)malloc(num_threads * sizeof(struct thread *));
+	if (thpool_p->threads == NULL){
+		err("thpool_init(): Could not allocate memory for threads\n");
+		jobqueue_destroy(&thpool_p->jobqueue);
+		free(thpool_p);
+		return NULL;
+	}
+
+	pthread_mutex_init(&(thpool_p->thcount_lock), NULL);
+	pthread_cond_init(&thpool_p->threads_all_idle, NULL);
+	/* Thread init */
+	int n;
+	for (n=0; n<num_threads; n++){
+		thread_init(thpool_p, &thpool_p->threads[n], n);
+		if(resource_free && resource_cb) {
+			thpool_p->threads[n]->user_resources = (resource_cb)(resource_cb_arg);
+		}
+#if THPOOL_DEBUG
+			printf("THPOOL_DEBUG: Created thread %d in pool \n", n);
+#endif
+	}
+
+	/* Wait for threads to initialize */
+	while (thpool_p->num_threads_alive != num_threads) {}
+
+	return thpool_p;
+}
 
 /* Add work to the thread pool */
 int thpool_add_work(thpool_* thpool_p, void (*function_p)(void*), void* arg_p){
@@ -184,6 +239,28 @@ int thpool_add_work(thpool_* thpool_p, void (*function_p)(void*), void* arg_p){
 
 	/* add function and argument */
 	newjob->function=function_p;
+	newjob->function_ex=NULL;
+	newjob->arg=arg_p;
+
+	/* add job to queue */
+	jobqueue_push(&thpool_p->jobqueue, newjob);
+
+	return 0;
+}
+
+/* Add work to the thread pool */
+int thpool_add_work_ex(thpool_* thpool_p, void (*function_p)(void*,void*), void* arg_p){
+	job* newjob;
+
+	newjob=(struct job*)malloc(sizeof(struct job));
+	if (newjob==NULL){
+		err("thpool_add_work(): Could not allocate memory for new job\n");
+		return -1;
+	}
+
+	/* add function and argument */
+	newjob->function=NULL;
+	newjob->function_ex=function_p;
 	newjob->arg=arg_p;
 
 	/* add job to queue */
@@ -235,6 +312,9 @@ void thpool_destroy(thpool_* thpool_p){
 	/* Deallocs */
 	int n;
 	for (n=0; n < threads_total; n++){
+		if(thpool_p->user_resources_free && thpool_p->threads[n]->user_resources) {
+			(thpool_p->user_resources_free)(thpool_p->threads[n]->user_resources);
+		}
 		thread_destroy(thpool_p->threads[n]);
 	}
 	free(thpool_p->threads);
@@ -358,12 +438,21 @@ static void* thread_do(struct thread* thread_p){
 
 			/* Read job from queue and execute it */
 			void (*func_buff)(void*);
+			void (*func_buff_ex)(void*,void*);
 			void*  arg_buff;
+			void*  thd_arg = thread_p->user_resources;
 			job* job_p = jobqueue_pull(&thpool_p->jobqueue);
 			if (job_p) {
-				func_buff = job_p->function;
-				arg_buff  = job_p->arg;
-				func_buff(arg_buff);
+				if(job_p->function) {
+					func_buff = job_p->function;
+					arg_buff  = job_p->arg;
+					func_buff(arg_buff);
+				}
+				else if(job_p->function_ex) {
+					func_buff_ex = job_p->function_ex;
+					arg_buff  = job_p->arg;
+					func_buff_ex(arg_buff, thread_p->user_resources);
+				}
 				free(job_p);
 			}
 

@@ -14,8 +14,6 @@ SET(sprocket_SRCS
 	base64.c
 	llist.c
 	queue.c
-	thd_worker.c
-	thd_pool.c
 	thpool.c
 )
   
