@@ -1,7 +1,6 @@
 
-OPTION(RUN_TESTS "Build and run tests" ON)
 
-IF(RUN_TESTS)
+IF(SPROCKET_TESTS)
 	FIND_PACKAGE(Check REQUIRED)
 	ENABLE_TESTING()
 	SET(all_tests "")
