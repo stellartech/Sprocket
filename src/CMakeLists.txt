@@ -13,6 +13,7 @@ SET(sprocket_SRCS
 	hashmap.c
 	base64.c
 	llist.c
+	buffer.c
 	queue.c
 	thpool.c
 )
