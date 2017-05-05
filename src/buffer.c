@@ -94,6 +94,29 @@ buffer_append(buffer_pt inp_self, void *inp, int in_len)
 	return inp_self;
 }
 
+int
+buffer_is_equal(buffer_pt inp_self, buffer_pt inp_other)
+{
+	if(inp_self && inp_other) {
+		if(inp_self->p_buf == inp_other->p_buf) return 0;
+		if(inp_self->len == inp_other->len) {
+			if(0 == memcmp(inp_self->p_buf, inp_other->p_buf, inp_self->len)) 
+				return 0;
+		}
+	}
+	return -1;	
+}
+
+buffer_pt
+buffer_clone(buffer_pt inp_self)
+{
+	if(inp_self && inp_self->p_buf && inp_self->len > 0) {
+		buffer_pt p_clone = buffer_new(inp_self->p_buf, inp_self->len);
+	}
+	return NULL;
+}
+
+
 #ifdef __cplusplus
 }
 #endif
