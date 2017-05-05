@@ -20,7 +20,6 @@ IF(RUN_TESTS)
 	ADD_SPROCKET_TEST(check_queue)
 	ADD_SPROCKET_TEST(check_base64)
 	ADD_SPROCKET_TEST(check_ws_magic)
-	ADD_SPROCKET_TEST(check_th_pool)
 	ADD_SPROCKET_TEST(check_th_pool_ex)
 ENDIF()
 
