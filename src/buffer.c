@@ -94,16 +94,6 @@ buffer_append(buffer_pt inp_self, void *inp, int in_len)
 	return inp_self;
 }
 
-buffer_pt
-buffer_clear(buffer_pt inp_self)
-{
-	if(inp_self) {
-		if(inp_self->p_buf) free(inp_self->p_buf);
-		inp_self->p_buf = NULL;
-		inp_self->len = 0;
-	}
-}
-
 #ifdef __cplusplus
 }
 #endif

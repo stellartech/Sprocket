@@ -32,10 +32,6 @@ buffer_len(buffer_pt inp_self);
 buffer_pt
 buffer_append(buffer_pt inp_self, void *inp, int in_len);
 
-buffer_pt
-buffer_clear(buffer_pt inp_self);
-
-
 #ifdef __cplusplus
 }
 #endif
