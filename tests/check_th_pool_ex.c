@@ -27,46 +27,94 @@
 #include <unistd.h>
 #include <pthread.h>
 
+#include <nanomsg/nn.h>
+#include <nanomsg/pipeline.h>
+
 #include "../src/thpool.h"
 
-// Simple test based on:
-// https://github.com/Pithikos/C-Thread-Pool/blob/master/tests/src/api.c
+#define SOCKET_ADDRESS "inproc://a"
 
-typedef struct
-{
-	int sleep_for;
-} 
-thd_func_args_t;
+int pull_sock;
+threadpool thpool;
 
-void sleep_secs(void* inp)
+typedef struct 
 {
-	thd_func_args_t *p_args = (thd_func_args_t*)inp;
-	sleep(p_args->sleep_for);
+	int	nano_push_sock;
+}
+thd_resource_t;
+
+void*
+thd_resource_init(void *inp) 
+{
+	thd_resource_t* p_resource = calloc(1, sizeof(thd_resource_t));
+	if(p_resource) {
+		p_resource->nano_push_sock = nn_socket(AF_SP, NN_PUSH);
+		nn_connect(p_resource->nano_push_sock, SOCKET_ADDRESS);
+	}
+	return p_resource;	
 }
 
-threadpool thpool;
+void
+thd_resource_free(void* inp)
+{
+	thd_resource_t* p_resource = (thd_resource_t*)inp;
+	nn_close(p_resource->nano_push_sock);
+	free(inp);
+}
 
 void setup(void)
 {
-	thpool = thpool_init(10);
+	pull_sock = nn_socket(AF_SP, NN_PULL);
+	nn_bind(pull_sock, SOCKET_ADDRESS);
+	thpool = thpool_init_ex(10, thd_resource_init, NULL, thd_resource_free);
 }
 
 void teardown(void)
 {
 	thpool_destroy(thpool);
+	nn_close(pull_sock);
+}
+
+typedef struct
+{
+	char *p;
+} 
+thd_func_args_t;
+
+void thdfunc(void* inp, void* inp_resources)
+{
+	thd_func_args_t *p_args = (thd_func_args_t*)inp;
+	thd_resource_t  *p_resources = (thd_resource_t*)inp_resources;
+	if(p_resources && p_resources->nano_push_sock) {
+		nn_send(p_resources->nano_push_sock, p_args->p, 4, NN_DONTWAIT);
+	}
+}
+
+static int check_rval(char *inp) 
+{
+	// msgs can arrive out of order
+	if(strcmp(inp, "ABC") == 0) return 1;
+	if(strcmp(inp, "DEF") == 0) return 1;
+	if(strcmp(inp, "GHI") == 0) return 1;
+	if(strcmp(inp, "JKL") == 0) return 1;
+	return 0;
 }
 
 START_TEST(test_th_pool) 
 {
-	int num = 0;
-	thd_func_args_t args = { .sleep_for = 1 }; // RO so should be ok to share
-	thpool_add_work(thpool, (void*)sleep_secs, &args);
-	thpool_add_work(thpool, (void*)sleep_secs, &args);
-	thpool_add_work(thpool, (void*)sleep_secs, &args);
-	thpool_add_work(thpool, (void*)sleep_secs, &args);
-	usleep(100);
-	num = thpool_num_threads_working(thpool);
-	ck_assert_int_eq(4, thpool_num_threads_working(thpool));
+	thd_func_args_t args1 = { .p = "ABC" }; 
+	thd_func_args_t args2 = { .p = "DEF" }; 
+	thd_func_args_t args3 = { .p = "GHI" }; 
+	thd_func_args_t args4 = { .p = "JKL" }; 
+	thpool_add_work_ex(thpool, (void*)thdfunc, &args1);
+	thpool_add_work_ex(thpool, (void*)thdfunc, &args2);
+	thpool_add_work_ex(thpool, (void*)thdfunc, &args3);
+	thpool_add_work_ex(thpool, (void*)thdfunc, &args4);
+	for(int i = 0; i < 4; i++) {
+		char rx[32];
+		nn_recv(pull_sock, rx, sizeof(rx), 0);
+		ck_assert(check_rval(rx));
+	}
 }
 END_TEST
 
@@ -75,7 +123,7 @@ Suite *suite()
 	Suite *s;
 	TCase *tc_core;
 
-	s = suite_create("TH_POOL");
+	s = suite_create("TH_POOL_EX");
 
 	tc_core = tcase_create("Core");
 	tcase_add_checked_fixture(tc_core, setup, teardown);
@@ -94,7 +142,7 @@ main(void)
 	SRunner *sr;
 	s = suite();
 	sr = srunner_create(s);
-	srunner_set_log (sr, "thd_pool.log");
+	srunner_set_log (sr, "thd_pool_ex.log");
 	srunner_run_all(sr, CK_NORMAL);
 	number_failed = srunner_ntests_failed(sr);
 	srunner_free(sr);
