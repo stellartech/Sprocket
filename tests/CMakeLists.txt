@@ -20,5 +20,6 @@ IF(SPROCKET_TESTS)
 	ADD_SPROCKET_TEST(check_base64)
 	ADD_SPROCKET_TEST(check_ws_magic)
 	ADD_SPROCKET_TEST(check_th_pool_ex)
+	ADD_SPROCKET_TEST(check_listener)
 ENDIF()
 
