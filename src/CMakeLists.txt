@@ -10,6 +10,7 @@ SET(CMAKE_LIBRARY_PATH ${CMAKE_LIBRARY_PATH}
 SET(sprocket_SRCS
 	ws_ht_parser.c
 	ws_magic.c
+	ws_frame.c
 	listener.c
 	hashmap.c
 	base64.c
