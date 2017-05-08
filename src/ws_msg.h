@@ -13,7 +13,9 @@
 #ifdef WS_MSG_FRIEND
 struct _ws_msg
 {
+	int state;
         int refcount;
+	int frag_count;
 	ws_frag_pt p_first_frag;
 	ws_frag_pt p_last_frag;
 };
