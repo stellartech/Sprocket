@@ -145,7 +145,7 @@ START_TEST(test_ws_frame_looped)
 	mask = (p_mask[0]!=0||p_mask[1]!=0||p_mask[2]!=0||p_mask[3]!=0) ?  4 : 0;
 	p_test_data = calloc(1, test_size + 256);
 	ws_frame_pt p_local = ws_frame_ctor();
-	p_test_data[0] = mask ? 0x80 : 0;
+	p_test_data[0] = mask ? 0x81 : 1;
 	if(test_size < 126) {
 		offset = 2 + mask;
 		p_test_data[1] = (unsigned char)(test_size & 0x7F);
