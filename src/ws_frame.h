@@ -15,9 +15,6 @@ struct _ws_frame
         uint64_t frame_in;
         char *p_payload;
         uint64_t payload_len;
-#ifdef USE_TREADS
-        pthread_mutex_t lock;
-#endif
 };
 #else
 struct _ws_frame;
@@ -37,7 +34,7 @@ ws_frame_dtor(ws_frame_pt *inpp_self);
 
 uint64_t
 ws_frame_append_chunk(ws_frame_pt inp_self, 
-	char *inp, int in_len);
+	char *inp, uint64_t in_len);
 
 uint64_t
 ws_frame_append_bufferevent(ws_frame_pt inp_self, 
