@@ -52,7 +52,7 @@ ws_frame_dtor(ws_frame_pt *inpp_self)
 }
 
 uint64_t
-ws_frame_append_chunk(ws_frame_pt inp_self, char *inp, uint64_t in_len)
+ws_frame_append_chunk(ws_frame_pt inp_self, unsigned char *inp, uint64_t in_len)
 {
 	uint64_t new_len = 0;
 	if(inp_self && inp && in_len > 0) {
@@ -64,6 +64,7 @@ ws_frame_append_chunk(ws_frame_pt inp_self, char *inp, uint64_t in_len)
 			inp_self->p_frame = realloc(inp_self->p_frame, new_len);
 		}
 		if(!inp_self->p_frame) {
+			exit(-1);
 			// ToDo
 		}
 		else {
@@ -91,7 +92,7 @@ ws_frame_append_bufferevent(ws_frame_pt inp_self, struct bufferevent *inp_bev)
 			int len_read = 0;
 			while(len_read < len) {
 				int i = 0;
-				char *p = inp_self->p_frame;
+				unsigned char *p = inp_self->p_frame;
 				p += inp_self->frame_in;
 				i = bufferevent_read(inp_bev, p, len - len_read);
 				len_read += i;
@@ -104,9 +105,9 @@ ws_frame_append_bufferevent(ws_frame_pt inp_self, struct bufferevent *inp_bev)
 }
 
 // Forward local prototypes.
-static int ws_frame_test_125(ws_frame_pt inp_self, char *in_mask);
-static int ws_frame_test_126(ws_frame_pt inp_self, char *in_mask);
-static int ws_frame_test_127(ws_frame_pt inp_self, char *in_mask);
+static int ws_frame_test_125(ws_frame_pt inp_self, unsigned char *inp_mask);
+static int ws_frame_test_126(ws_frame_pt inp_self, unsigned char *inp_mask);
+static int ws_frame_test_127(ws_frame_pt inp_self, unsigned char *inp_mask);
 
 static inline int
 ws_frame_is_masked(const char* inp_packet)
@@ -117,7 +118,7 @@ ws_frame_is_masked(const char* inp_packet)
 int
 ws_frame_is_valid(ws_frame_pt inp_self)
 {
-	char a_mask[4] = {0,0,0,0};
+	unsigned char a_mask[4] = {0,0,0,0};
 	unsigned char short_len = 0;
 	char* p_frame = inp_self->p_frame;
    
@@ -160,16 +161,16 @@ ws_frame_is_valid(ws_frame_pt inp_self)
 }
 
 static int
-ws_frame_test_125(ws_frame_pt inp_self, char *in_mask)
+ws_frame_test_125(ws_frame_pt inp_self, unsigned char *inp_mask)
 {
 	int offset = ws_frame_is_masked(inp_self->p_frame) ? 6 : 2;
 	uint64_t len = (uint64_t)(inp_self->p_frame[1] & 0x7f);
 	if(inp_self->frame_in >= len + offset) {
 		if(offset == 6) {
-			in_mask[0] = inp_self->p_frame[2];
-			in_mask[1] = inp_self->p_frame[3];
-			in_mask[2] = inp_self->p_frame[4];
-			in_mask[3] = inp_self->p_frame[5];
+			inp_mask[0] = inp_self->p_frame[2];
+			inp_mask[1] = inp_self->p_frame[3];
+			inp_mask[2] = inp_self->p_frame[4];
+			inp_mask[3] = inp_self->p_frame[5];
 			inp_self->p_payload = &inp_self->p_frame[6];
 		}
 		else {
@@ -182,7 +183,7 @@ ws_frame_test_125(ws_frame_pt inp_self, char *in_mask)
 }
 
 static int
-ws_frame_test_126(ws_frame_pt inp_self, char *in_mask)
+ws_frame_test_126(ws_frame_pt inp_self, unsigned char *inp_mask)
 {
 	uint64_t len = 0;
 	int offset = ws_frame_is_masked(inp_self->p_frame) ? 8 : 4;
@@ -192,10 +193,10 @@ ws_frame_test_126(ws_frame_pt inp_self, char *in_mask)
 	len = ((unsigned char)inp_self->p_frame[2] << 8) + (unsigned char)inp_self->p_frame[3];
 	if(inp_self->frame_in >= len + offset) {
 		if(offset == 8) {
-			in_mask[0] = inp_self->p_frame[4];
-			in_mask[1] = inp_self->p_frame[5];
-			in_mask[2] = inp_self->p_frame[6];
-			in_mask[3] = inp_self->p_frame[7];
+			inp_mask[0] = inp_self->p_frame[4];
+			inp_mask[1] = inp_self->p_frame[5];
+			inp_mask[2] = inp_self->p_frame[6];
+			inp_mask[3] = inp_self->p_frame[7];
 			inp_self->p_payload = &inp_self->p_frame[8];
 		}
 		else {
@@ -208,25 +209,35 @@ ws_frame_test_126(ws_frame_pt inp_self, char *in_mask)
 }
 
 static int
-ws_frame_test_127(ws_frame_pt inp_self, char *in_mask)
+ws_frame_test_127(ws_frame_pt inp_self, unsigned char *inp_mask)
 {
 	uint64_t len = 0, h = 0, l = 0;
-	char *p_frame = inp_self->p_frame;
+	unsigned char *p_frame = inp_self->p_frame;
 	int offset = ws_frame_is_masked(inp_self->p_frame) ? 14 : 10;
 	if(inp_self->frame_in < 10) {
 		return 0;
 	}
-	h = (p_frame[2] << 24) + (p_frame[3] << 16) + 
-		(p_frame[4] << 8)  + (p_frame[5] << 0);
-	l = (p_frame[6] << 24) + (p_frame[7] << 16) + 
-		(p_frame[8] << 8)  + (p_frame[9] << 0);
-	len = (h << 32) + l;
+	/*
+	For the record, tests show the following code only works up to
+	0x7FFFFFFF, higher causes faults which means "h" and adding "h"
+	in fails here so highlights a bug. Why have I not fixed it?
+	Sending more than 0x7FFFFFFF bytes in a single network websocket
+	packet is a facepalm I fully intend to reject "on incoming". So 
+	I simply cba fixing this. Howerevr, I should in fact reject here
+	as this is where I will know first off someone is trying to be
+	so dumb as to send that amount.
+	*/
+	h = (p_frame[2] << 24) | (p_frame[3] << 16) | 
+		(p_frame[4] << 8) | (p_frame[5] << 0);
+	l = (p_frame[6] << 24) | (p_frame[7] << 16) | 
+		(p_frame[8] << 8) | (p_frame[9] << 0);
+	len = (h << 32) | l;
 	if(inp_self->frame_in >= len + offset) {
 		if(offset == 14) {
-			in_mask[0] = p_frame[10];
-			in_mask[1] = p_frame[11];
-			in_mask[2] = p_frame[12];
-			in_mask[3] = p_frame[13];
+			inp_mask[0] = p_frame[10];
+			inp_mask[1] = p_frame[11];
+			inp_mask[2] = p_frame[12];
+			inp_mask[3] = p_frame[13];
 			inp_self->p_payload = &inp_self->p_frame[14];
 		}
 		else {

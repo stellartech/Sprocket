@@ -33,175 +33,179 @@
 #define WS_FRAME_FRIEND
 #include "../src/ws_frame.h"
 
-ws_frame_pt p_frame = NULL;
-
 void setup(void)
 {
-	p_frame = ws_frame_ctor();
 }
 
 void teardown(void)
 {
-	ws_frame_dtor(&p_frame);
 }
 
-START_TEST(test_ws_frame_ctor)
+static uint64_t 
+load_random(uint64_t in_how_much, unsigned char *inp_dst)
 {
-	ck_assert(p_frame);
-}
-END_TEST
-
-#define RANDOM_BUFFER_SIZE (65535 + 65535)
-char random_buffer[RANDOM_BUFFER_SIZE];
-
-static ssize_t 
-load_random_buffer(ssize_t in_how_much)
-{
-	ssize_t randomDataRead = 0;
+	uint64_t randomDataRead = 0;
 	int randomFd = open("/dev/urandom", O_RDONLY);
 	if(randomFd) {
-		randomDataRead = read(randomFd, random_buffer, in_how_much);
+		randomDataRead = read(randomFd, inp_dst, in_how_much);
 		close(randomFd);	
 	}
 	return randomDataRead;
 }
 
+typedef struct {
+	uint64_t test_size;
+	char mask[4];
+} test_item_t;
 
-START_TEST(test_ws_frame_buf_124)
+#define MASKED 'a','b','c','d'
+
+// We don't fully test all the way up as it takes a long time
+// for the tests to complete. Uncomment this if you are debugging
+// really high buffer counts.
+// #define FULL_WS_FRAME_TEST
+
+test_item_t test_items[] =
 {
-	ssize_t how_many = load_random_buffer(256);
-	unsigned char test_buf_a[256];
-	test_buf_a[0] = 0;
-	test_buf_a[1] = 124;
-	memcpy(&test_buf_a[2], random_buffer, 124);
-	ws_frame_append_chunk(p_frame, test_buf_a, 126);
-	ck_assert(ws_frame_is_valid(p_frame) != 0);
-	ck_assert_int_eq(p_frame->frame_in, 126);
-	ck_assert_int_eq(p_frame->payload_len, 124);
-	ck_assert(memcmp(p_frame->p_payload, random_buffer, 124) == 0);
+	  { 0x00000001UL,       { 0,0,0,0 } } // 0
+	, { 0x00000010UL,       { 0,0,0,0 } } // 1
+	, { 0x00000010UL - 1,   { 0,0,0,0 } } // 2
+	, { 0x00000010UL + 1,   { 0,0,0,0 } } // 3
+	, { 0x00000100UL,       { 0,0,0,0 } } // 4 
+	, { 0x00000100UL - 1,   { 0,0,0,0 } } // 5
+	, { 0x00000100UL + 1,   { 0,0,0,0 } } // 6
+	, { 0x00001000UL,       { 0,0,0,0 } } // 7
+	, { 0x00001000UL - 1,   { 0,0,0,0 } } // 8
+	, { 0x00001000UL + 1,   { 0,0,0,0 } } // 9
+	, { 0x00010000UL,       { 0,0,0,0 } } // 10
+	, { 0x00010000UL - 1,   { 0,0,0,0 } } // 11
+	, { 0x00010000UL + 1,   { 0,0,0,0 } } // 12
+#ifdef FULL_WS_FRAME_TEST
+	, { 0x00100000UL,       { 0,0,0,0 } }
+	, { 0x00100000UL - 1,   { 0,0,0,0 } }
+	, { 0x00100000UL + 1,   { 0,0,0,0 } }
+	, { 0x01000000UL,       { 0,0,0,0 } }
+	, { 0x01000000UL - 1,   { 0,0,0,0 } }
+	, { 0x01000000UL + 1,   { 0,0,0,0 } }
+	, { 0x10000000UL,       { 0,0,0,0 } }
+	, { 0x10000000UL - 1,   { 0,0,0,0 } }
+	, { 0x10000000UL + 1,   { 0,0,0,0 } }
+	, { 0x7FFFFFFFUL,       { 0,0,0,0 } }
+#endif
+
+	, { 0x00000001UL,       { MASKED } }
+	, { 0x00000010UL,       { MASKED } }
+	, { 0x00000010UL - 1,   { MASKED } }
+	, { 0x00000010UL + 1,   { MASKED } }
+	, { 0x00000100UL,       { MASKED } }
+	, { 0x00000100UL - 1,   { MASKED } }
+	, { 0x00000100UL + 1,   { MASKED } }
+	, { 0x00001000UL,       { MASKED } }
+	, { 0x00001000UL - 1,   { MASKED } }
+	, { 0x00001000UL + 1,   { MASKED } }
+	, { 0x00010000UL,       { MASKED } }
+	, { 0x00010000UL - 1,   { MASKED } }
+	, { 0x00010000UL + 1,   { MASKED } }
+#ifdef FULL_WS_FRAME_TEST
+	, { 0x00100000UL,       { MASKED } }
+	, { 0x00100000UL - 1,   { MASKED } }
+	, { 0x00100000UL + 1,   { MASKED } }
+	, { 0x01000000UL,       { MASKED } }
+	, { 0x01000000UL - 1,   { MASKED } }
+	, { 0x01000000UL + 1,   { MASKED } }
+	, { 0x10000000UL,       { MASKED } }
+	, { 0x10000000UL - 1,   { MASKED } }
+	, { 0x10000000UL + 1,   { MASKED } }
+	, { 0x7FFFFFFFUL,       { MASKED } }
+#endif
+};
+
+#include <stdio.h>
+static void
+log_packet(unsigned char *inp) {
+	FILE *fp = fopen("blob", "a+");
+	if(fp) {
+		for(int i = 0; i < 16; i++) {
+			fprintf(fp, "%02x ", *(inp+i));
+		}
+		fprintf(fp, "\n");
+		fclose(fp);
+	}
 
 }
-END_TEST
 
-START_TEST(test_ws_frame_buf_125)
+START_TEST(test_ws_frame_non_masked_looped)
 {
-	ssize_t how_many = load_random_buffer(256);
-	unsigned char test_buf_a[256];
-	test_buf_a[0] = 0;
-	test_buf_a[1] = 125;
-	memcpy(&test_buf_a[2], random_buffer, 125);
-	ws_frame_append_chunk(p_frame, test_buf_a, 127);
-	ck_assert(ws_frame_is_valid(p_frame) != 0);
-	ck_assert_int_eq(p_frame->frame_in, 127);
-	ck_assert_int_eq(p_frame->payload_len, 125);
-	ck_assert(memcmp(p_frame->p_payload, random_buffer, 125) == 0);
-}
-END_TEST
-
-START_TEST(test_ws_frame_buf_126)
-{
-	ssize_t how_many = load_random_buffer(256);
-	unsigned char test_buf_a[256];
-	test_buf_a[0] = 0;
-	test_buf_a[1] = 126;
-	test_buf_a[2] = 0;
-	test_buf_a[3] = 126;
-	memcpy(&test_buf_a[4], random_buffer, 126);
-	ws_frame_append_chunk(p_frame, test_buf_a, 130);
-	ck_assert(ws_frame_is_valid(p_frame) != 0);
-	ck_assert_int_eq(p_frame->frame_in, 130);
-	ck_assert_int_eq(p_frame->payload_len, 126);
-	ck_assert(memcmp(p_frame->p_payload, random_buffer, 126) == 0);
-}
-END_TEST
-
-START_TEST(test_ws_frame_buf_127)
-{
-	ssize_t how_many = load_random_buffer(256);
-	unsigned char test_buf_a[256];
-	test_buf_a[0] = 0;
-	test_buf_a[1] = 126;
-	test_buf_a[2] = 0;
-	test_buf_a[3] = 127;
-	memcpy(&test_buf_a[4], random_buffer, 127);
-	ws_frame_append_chunk(p_frame, test_buf_a, 131);
-	ck_assert(ws_frame_is_valid(p_frame) != 0);
-	ck_assert_int_eq(p_frame->frame_in, 131);
-	ck_assert_int_eq(p_frame->payload_len, 127);
-	ck_assert(memcmp(p_frame->p_payload, random_buffer, 127) == 0);
-}
-END_TEST
-
-START_TEST(test_ws_frame_buf_65535)
-{
-	ssize_t how_many = load_random_buffer(65535);
-	unsigned char test_buf_a[65535 + 256];
-	test_buf_a[0] = 0;
-	test_buf_a[1] = 126;
-	test_buf_a[2] = 0xFF;
-	test_buf_a[3] = 0xFF;
-	memcpy(&test_buf_a[4], random_buffer, 65535);
-	ws_frame_append_chunk(p_frame, test_buf_a, 65535+4);
-	ck_assert(ws_frame_is_valid(p_frame) != 0);
-	ck_assert_int_eq(p_frame->frame_in, 65535+4);
-	ck_assert_int_eq(p_frame->payload_len, 65535);
-	ck_assert(memcmp(p_frame->p_payload, random_buffer, 65535) == 0);
-}
-END_TEST
-
-START_TEST(test_ws_frame_buf_65536)
-{
+	int offset, mask = 0;
 	uint64_t copied;
-	ssize_t how_many = load_random_buffer(65536);
-	unsigned char test_buf_a[65536 + 256];
-	ck_assert(how_many == 65536);
-	test_buf_a[0] = 0;
-	test_buf_a[1] = 127;
-	test_buf_a[2] = 0;
-	test_buf_a[3] = 0;
-	test_buf_a[4] = 0;
-	test_buf_a[5] = 0;
-	test_buf_a[6] = 0;
-	test_buf_a[7] = 1;
-	test_buf_a[8] = 0;
-	test_buf_a[9] = 0;
-	memcpy(&test_buf_a[10], random_buffer, 65536);
-	copied = ws_frame_append_chunk(p_frame, test_buf_a, 65536+10);
-	ck_assert(copied == 65536+10);
-	ck_assert_int_eq(p_frame->frame_in, 65536+10);
-	ck_assert(p_frame->p_frame != NULL);
-	ck_assert(ws_frame_is_valid(p_frame) != 0);
-	ck_assert(memcmp(p_frame->p_payload, random_buffer, 65536) == 0);
-	ck_assert_int_eq(p_frame->payload_len, 65536);
+	uint64_t test_size;
+	unsigned char *p_test_data;
+	char *p_mask = test_items[_i].mask;
+	test_size = test_items[_i].test_size;
+	mask = (p_mask[0]!=0||p_mask[1]!=0||p_mask[2]!=0||p_mask[3]!=0) ?  4 : 0;
+	p_test_data = calloc(1, test_size + 256);
+	ws_frame_pt p_local = ws_frame_ctor();
+	p_test_data[0] = mask ? 0x80 : 0;
+	if(test_size < 126) {
+		offset = 2 + mask;
+		p_test_data[1] = (unsigned char)(test_size & 0x7F);
+		if(mask) {
+			p_test_data[2] = p_mask[0];
+			p_test_data[3] = p_mask[1];
+			p_test_data[4] = p_mask[2];
+			p_test_data[5] = p_mask[3];
+		}
+		load_random(test_size, &p_test_data[offset]);
+	}
+	else if(test_size >= 126 && test_size < 65536) {
+		offset = 4 + mask;
+		p_test_data[1] = 126;
+		p_test_data[2] = (unsigned char)(test_size >> 8) & 0xFF;
+		p_test_data[3] = (unsigned char)test_size & 0xFF;
+		if(mask) {
+			p_test_data[4] = p_mask[0];
+			p_test_data[5] = p_mask[1];
+			p_test_data[6] = p_mask[2];
+			p_test_data[7] = p_mask[3];
+		}
+		load_random(test_size, &p_test_data[offset]);
+	}
+	else {
+		offset = 10 + mask;
+		p_test_data[1] = 127;
+		p_test_data[2] = (unsigned char)((test_size >> 56) & 0xFF);
+		p_test_data[3] = (unsigned char)((test_size >> 48) & 0xFF);
+		p_test_data[4] = (unsigned char)((test_size >> 40) & 0xFF);
+		p_test_data[5] = (unsigned char)((test_size >> 32) & 0xFF);
+		p_test_data[6] = (unsigned char)((test_size >> 24) & 0xFF);
+		p_test_data[7] = (unsigned char)((test_size >> 16) & 0xFF);
+		p_test_data[8] = (unsigned char)((test_size >> 8) & 0xFF);
+		p_test_data[9] = (unsigned char)(test_size & 0xFF);
+		if(mask) {
+			p_test_data[10] = p_mask[0];
+			p_test_data[11] = p_mask[1];
+			p_test_data[12] = p_mask[2];
+			p_test_data[13] = p_mask[3];
+		}
+		load_random(test_size, &p_test_data[offset]);
+	}
+	copied = ws_frame_append_chunk(p_local, p_test_data, test_size + offset);
+	ck_assert(copied == test_size + offset);
+	ck_assert_int_eq(p_local->frame_in, test_size + offset);
+	ck_assert(p_local->p_frame != NULL);
+	ck_assert(ws_frame_is_valid(p_local) != 0);
+	ck_assert_int_eq(p_local->payload_len, test_size);
+	if(mask) {
+		for(int i = 0; i < test_size; i++) {
+			p_local->p_payload[i] ^= p_mask[(i & 0x3)];
+		}
+	}
+	ck_assert(memcmp(p_local->p_payload, &p_test_data[offset], test_size) == 0);
+	free(p_test_data);
+	ws_frame_dtor(&p_local);
 }
 END_TEST
 
-START_TEST(test_ws_frame_buf_65537)
-{
-	uint64_t copied;
-	ssize_t how_many = load_random_buffer(65537);
-	unsigned char test_buf_a[65536 + 256];
-	ck_assert(how_many == 65537);
-	test_buf_a[0] = 0;
-	test_buf_a[1] = 127;
-	test_buf_a[2] = 0;
-	test_buf_a[3] = 0;
-	test_buf_a[4] = 0;
-	test_buf_a[5] = 0;
-	test_buf_a[6] = 0;
-	test_buf_a[7] = 1;
-	test_buf_a[8] = 0;
-	test_buf_a[9] = 1;
-	memcpy(&test_buf_a[10], random_buffer, 65537);
-	copied = ws_frame_append_chunk(p_frame, test_buf_a, 65537+10);
-	ck_assert(copied == 65537+10);
-	ck_assert_int_eq(p_frame->frame_in, 65537+10);
-	ck_assert(p_frame->p_frame != NULL);
-	ck_assert(ws_frame_is_valid(p_frame) != 0);
-	ck_assert(memcmp(p_frame->p_payload, random_buffer, 65537) == 0);
-	ck_assert_int_eq(p_frame->payload_len, 65537);
-}
-END_TEST
 
 Suite *suite()
 {
@@ -212,14 +216,9 @@ Suite *suite()
 
 	tc_core = tcase_create("Core");
 	tcase_add_checked_fixture(tc_core, setup, teardown);
-	tcase_add_test(tc_core, test_ws_frame_ctor);
-	tcase_add_test(tc_core, test_ws_frame_buf_124);
-	tcase_add_test(tc_core, test_ws_frame_buf_125);
-	tcase_add_test(tc_core, test_ws_frame_buf_126);
-	tcase_add_test(tc_core, test_ws_frame_buf_127);
-	tcase_add_test(tc_core, test_ws_frame_buf_65535);
-	tcase_add_test(tc_core, test_ws_frame_buf_65536);
-	tcase_add_test(tc_core, test_ws_frame_buf_65537);
+	tcase_add_loop_test(tc_core, test_ws_frame_non_masked_looped, 
+		0, (sizeof(test_items)/sizeof(test_item_t)));
+	tcase_set_timeout(tc_core, 60);
 	suite_add_tcase(s, tc_core);
 
 	return s;

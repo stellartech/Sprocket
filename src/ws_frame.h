@@ -11,9 +11,9 @@
 struct _ws_frame
 {
         int refcount;
-        char *p_frame;
+        unsigned char *p_frame;
         uint64_t frame_in;
-        char *p_payload;
+        unsigned char *p_payload;
         uint64_t payload_len;
 };
 #else
@@ -34,7 +34,7 @@ ws_frame_dtor(ws_frame_pt *inpp_self);
 
 uint64_t
 ws_frame_append_chunk(ws_frame_pt inp_self, 
-	char *inp, uint64_t in_len);
+	unsigned char *inp, uint64_t in_len);
 
 uint64_t
 ws_frame_append_bufferevent(ws_frame_pt inp_self, 
