@@ -134,7 +134,7 @@ log_packet(unsigned char *inp) {
 
 }
 
-START_TEST(test_ws_frame_non_masked_looped)
+START_TEST(test_ws_frame_looped)
 {
 	int offset, mask = 0;
 	uint64_t copied;
@@ -216,7 +216,7 @@ Suite *suite()
 
 	tc_core = tcase_create("Core");
 	tcase_add_checked_fixture(tc_core, setup, teardown);
-	tcase_add_loop_test(tc_core, test_ws_frame_non_masked_looped, 
+	tcase_add_loop_test(tc_core, test_ws_frame_looped, 
 		0, (sizeof(test_items)/sizeof(test_item_t)));
 	tcase_set_timeout(tc_core, 60);
 	suite_add_tcase(s, tc_core);
