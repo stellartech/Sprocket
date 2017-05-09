@@ -2,6 +2,8 @@
 #ifndef BUFFER_H_INCLUDED
 #define BUFFER_H_INCLUDED
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern C {
 #endif
@@ -15,10 +17,10 @@ buffer_pt
 buffer_ctor(void);
 
 buffer_pt
-buffer_new(void* inp, int in_len);
+buffer_new(void* inp, uint64_t in_len);
 
 buffer_pt
-buffer_new_byval(void* inp, int in_len);
+buffer_new_byval(void* inp, uint64_t in_len);
 
 void
 buffer_free(buffer_pt inp_self);
@@ -29,13 +31,13 @@ buffer_dtor(buffer_pt *inpp_self);
 const void*
 buffer_ptr(buffer_pt inp_self);
 
-int
+uint64_t
 buffer_len(buffer_pt inp_self);
 
 buffer_pt
-buffer_append(buffer_pt inp_self, void *inp, int in_len);
+buffer_append(buffer_pt inp_self, void *inp, uint64_t in_len);
 
-int 
+uint64_t 
 buffer_equals(buffer_pt inp_self, buffer_pt inp_other);
 
 buffer_pt

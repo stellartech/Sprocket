@@ -11,9 +11,9 @@ extern C {
 
 struct _buffer 
 {
-	int    refcount;
-	int    len;
-	void  *p_buf;	
+	int       refcount;
+	uint64_t  len;
+	void     *p_buf;	
 };
 
 buffer_pt
@@ -24,7 +24,7 @@ buffer_ctor(void)
 }
 
 buffer_pt
-buffer_new(void* inp, int in_len)
+buffer_new(void* inp, uint64_t in_len)
 {
 	buffer_pt p_self = buffer_ctor();
 	if(p_self) {
@@ -39,7 +39,7 @@ buffer_new(void* inp, int in_len)
 }
 
 buffer_pt
-buffer_new_byval(void* inp, int in_len)
+buffer_new_byval(void* inp, uint64_t in_len)
 {
 	buffer_pt p_self = buffer_ctor();
 	if(p_self) {
@@ -68,7 +68,7 @@ buffer_dtor(buffer_pt *inpp_self)
 	if(inpp_self) {
 		buffer_pt p_self = *inpp_self;
 		if(p_self) {
-			int refcount = p_self->refcount - 1;
+			uint64_t refcount = p_self->refcount - 1;
 			buffer_free(p_self);
 			if(refcount == 0) {
 				*inpp_self = NULL;
@@ -93,17 +93,17 @@ buffer_ptr(buffer_pt inp_self)
 	return inp_self ? (const void*)inp_self->p_buf : NULL;
 }
 
-int
+uint64_t
 buffer_len(buffer_pt inp_self)
 {
 	return inp_self ? inp_self->len : -1;
 }
 
 buffer_pt
-buffer_append(buffer_pt inp_self, void *inp, int in_len)
+buffer_append(buffer_pt inp_self, void *inp, uint64_t in_len)
 {
 	if(inp_self && in_len > 0) {
-		int new_len = inp_self->len + in_len;
+		uint64_t new_len = inp_self->len + in_len;
 		if(new_len != inp_self->len) {
 			inp_self->p_buf = inp_self->p_buf ?
 				realloc(inp_self->p_buf, new_len + 1) :
@@ -116,7 +116,7 @@ buffer_append(buffer_pt inp_self, void *inp, int in_len)
 	return inp_self;
 }
 
-int
+uint64_t
 buffer_is_equal(buffer_pt inp_self, buffer_pt inp_other)
 {
 	if(inp_self && inp_other) {
