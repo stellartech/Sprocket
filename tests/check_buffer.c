@@ -41,7 +41,9 @@ void setup(void)
 
 void teardown(void)
 {
+	ck_assert(p_buf);
 	buffer_dtor(&p_buf);
+	ck_assert(!p_buf);
 }
 
 START_TEST(test_buffer_basic)
@@ -68,6 +70,20 @@ START_TEST(test_buffer_append)
 }
 END_TEST
 
+START_TEST(test_buffer_byref)
+{
+	buffer_pt p_local = buffer_copy_byref(p_buf); // Adds a reference to refcount
+	ck_assert(p_local);
+	ck_assert_msg(memcmp(buffer_ptr(p_local), test_string1, sizeof(test_string1)-1) == 0,
+		"failed memcmp at line %d", __LINE__);
+	buffer_dtor(&p_local);
+	ck_assert(p_local);
+	ck_assert_msg(memcmp(buffer_ptr(p_local), test_string1, sizeof(test_string1)-1) == 0,
+		"failed memcmp at line %d", __LINE__);
+
+}
+END_TEST
+
 Suite *suite()
 {
 	Suite *s;
@@ -79,6 +95,7 @@ Suite *suite()
 	tcase_add_checked_fixture(tc_core, setup, teardown);
 	tcase_add_test(tc_core, test_buffer_basic);
 	tcase_add_test(tc_core, test_buffer_append);
+	tcase_add_test(tc_core, test_buffer_byref);
 	suite_add_tcase(s, tc_core);
 
 	return s;

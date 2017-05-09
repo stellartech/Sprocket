@@ -38,6 +38,18 @@ buffer_new(void* inp, int in_len)
 	return p_self;
 }
 
+buffer_pt
+buffer_new_byval(void* inp, int in_len)
+{
+	buffer_pt p_self = buffer_ctor();
+	if(p_self) {
+		p_self->p_buf = inp;
+		p_self->len = in_len;
+		p_self->refcount = 1;
+	}
+	return p_self;
+}
+
 void
 buffer_free(buffer_pt inp_self)
 {
@@ -63,6 +75,16 @@ buffer_dtor(buffer_pt *inpp_self)
 			}
 		}
 	}
+}
+
+buffer_pt
+buffer_copy_byref(buffer_pt inp_self)
+{
+	if(inp_self) {
+		inp_self->refcount++;
+		return inp_self;
+	}
+	return NULL;
 }
 
 const void*

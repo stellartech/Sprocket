@@ -142,3 +142,31 @@ ws_msg_memory_usage(ws_msg_pt inp_self)
 	return 0;
 }
 
+unsigned char*
+ws_msg_pullup(ws_msg_pt inp_self, uint64_t *outp_len)
+{
+	unsigned char *p_buf = NULL;
+	if(inp_self) {
+		p_buf = ws_frag_chain_pullup(inp_self->p_first_frag, outp_len);
+	}
+	return p_buf;
+}
+
+buffer_pt
+ws_msg_pullup_as_buffer(ws_msg_pt inp_self)
+{
+	uint64_t len;
+	buffer_pt p_buffer = NULL;
+	unsigned char *p_buf = NULL;
+	p_buf = ws_msg_pullup(inp_self, &len);
+	if(p_buf) {
+		if(len > 0) {
+			p_buffer = buffer_new_byval(p_buf, len);
+		}
+		else {
+			free(p_buf);
+			p_buf = NULL;
+		}
+	}
+	return p_buffer;
+}

@@ -17,6 +17,9 @@ buffer_ctor(void);
 buffer_pt
 buffer_new(void* inp, int in_len);
 
+buffer_pt
+buffer_new_byval(void* inp, int in_len);
+
 void
 buffer_free(buffer_pt inp_self);
 
@@ -37,6 +40,9 @@ buffer_equals(buffer_pt inp_self, buffer_pt inp_other);
 
 buffer_pt
 buffer_clone(buffer_pt inp_self);
+
+buffer_pt
+buffer_copy_byref(buffer_pt inp_self);
 
 #ifdef __cplusplus
 }

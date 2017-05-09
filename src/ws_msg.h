@@ -10,6 +10,8 @@
 #define WS_FRAG_FRIEND
 #include "ws_frag.h"
 
+#include "buffer.h"
+
 #ifdef WS_MSG_FRIEND
 struct _ws_msg
 {
@@ -47,6 +49,12 @@ ws_msg_is_valid(ws_msg_pt inp_self);
 
 uint64_t
 ws_msg_memory_usage(ws_msg_pt inp_self);
+
+unsigned char*
+ws_msg_pullup(ws_msg_pt inp_self, uint64_t *outp_len);
+
+buffer_pt
+ws_msg_pullup_as_buffer(ws_msg_pt inp_self);
 
 #endif /* WS_MSG_H_INCLUDED */
 
