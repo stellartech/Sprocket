@@ -17,7 +17,6 @@ struct _ws_msg
         int refcount;
 	int frag_count;
 	ws_frag_pt p_first_frag;
-	ws_frag_pt p_last_frag;
 };
 #else
 struct _ws_msg;
@@ -45,6 +44,9 @@ ws_msg_append_bufferevent(ws_msg_pt inp_self,
 
 int
 ws_msg_is_valid(ws_msg_pt inp_self);
+
+uint64_t
+ws_msg_memory_usage(ws_msg_pt inp_self);
 
 #endif /* WS_MSG_H_INCLUDED */
 

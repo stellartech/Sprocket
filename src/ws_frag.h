@@ -4,10 +4,16 @@
 #define WS_FRAG_H_INCLUDED
 
 #include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include <event2/bufferevent.h>
 
-#ifdef WS_FRAG_FRIEND
+#ifndef WS_FRAG_FRIEND
+struct _ws_frag;
+typedef struct _ws_frag   ws_frag_t;
+typedef struct _ws_frag * ws_frag_pt;
+#else
 struct _ws_frag
 {
         int refcount;
@@ -25,17 +31,67 @@ struct _ws_frag
         const unsigned char *p_payload;
 	struct _ws_frag *p_next;
 }; 
-#else
-struct _ws_frag;
-#endif
-
-#define DUMP_FRAG(x) \
-	do {\
-		ck_assert_msg(1==0, "mask:%u,fin:%u,op:%u,short_len:%u,len:%lx",x->mask,x->fin,x->opcode,x->short_len,x->payload.len);\
-	} while(0)
-
 typedef struct _ws_frag   ws_frag_t;
 typedef struct _ws_frag * ws_frag_pt;
+
+static inline int
+ws_frag_chain_count(ws_frag_pt inp)
+{
+	int rval = 0;
+	while(inp) {
+		rval++;
+		inp = inp->p_next;
+	}
+	return rval;
+}
+
+static inline ws_frag_pt
+ws_frag_chain_last(ws_frag_pt inp) 
+{
+	while(inp && inp->p_next) inp = inp->p_next;
+	return inp;
+}
+
+static inline uint64_t 
+ws_frag_chain_len(ws_frag_pt inp)
+{
+	uint64_t rval = 0;
+	while(inp) {
+		rval += inp->payload.len;
+		inp = inp->p_next;
+	}
+	return rval;
+}
+
+static inline uint64_t 
+ws_frag_chain_fraglen(ws_frag_pt inp)
+{
+	uint64_t rval = 0;
+	while(inp) {
+		rval += inp->frag_in;
+		inp = inp->p_next;
+	}
+	return rval;
+}
+
+static unsigned char*
+ws_frag_chain_pullup(ws_frag_pt inp, uint64_t *outp_len)
+{
+	uint64_t len = 0, so_far = 0;
+	unsigned char *p_rval = NULL;
+	if((len = ws_frag_chain_len(inp)) > 0) {
+		if((p_rval = calloc(1, len)) != NULL) {
+			while(inp && so_far < len) {
+				memcpy(p_rval + so_far, inp->p_payload, inp->payload.len);
+				so_far += inp->payload.len;
+				inp = inp->p_next;	
+			}
+		}
+		if(outp_len != NULL) *outp_len = len;
+	}
+	return p_rval;
+}
+#endif
 
 ws_frag_pt
 ws_frag_ctor(void);

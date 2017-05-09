@@ -12,6 +12,7 @@ SET(sprocket_SRCS
 	ws_magic.c
 	ws_frame.c
 	ws_frag.c
+	ws_msg.c
 	listener.c
 	hashmap.c
 	base64.c

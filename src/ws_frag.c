@@ -1,7 +1,4 @@
 
-#include <stdlib.h>
-#include <string.h>
-
 #include <event2/buffer.h>
 
 #define WS_FRAG_FRIEND
@@ -11,9 +8,6 @@ ws_frag_pt
 ws_frag_ctor(void)
 {
 	ws_frag_pt p_self = calloc(1, sizeof(ws_frag_t));
-	if(p_self) {
-
-	}
 	return p_self;
 }
 

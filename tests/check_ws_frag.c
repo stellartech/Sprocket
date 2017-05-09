@@ -33,24 +33,14 @@
 #define WS_FRAG_FRIEND
 #include "../src/ws_frag.h"
 
+#include "ws_frag_maker.h"
+
 void setup(void)
 {
 }
 
 void teardown(void)
 {
-}
-
-static uint64_t 
-load_random(uint64_t in_how_much, unsigned char *inp_dst)
-{
-	uint64_t randomDataRead = 0;
-	int randomFd = open("/dev/urandom", O_RDONLY);
-	if(randomFd) {
-		randomDataRead = read(randomFd, inp_dst, in_how_much);
-		close(randomFd);	
-	}
-	return randomDataRead;
 }
 
 typedef struct {
@@ -119,89 +109,21 @@ test_item_t test_items[] =
 #endif
 };
 
-#include <stdio.h>
-static void
-log_packet(unsigned char *inp, unsigned char *inp2) {
-	FILE *fp = fopen("blob", "a+");
-	if(fp) {
-		for(int i = 0; i < 16; i++) {
-			fprintf(fp, "%02x ", *(inp+i));
-		}
-		fprintf(fp, "\n");
-		for(int i = 0; i < 16; i++) {
-			fprintf(fp, "%02x ", *(inp+i));
-		}
-		fprintf(fp, "\n\n");
-		fclose(fp);
-	}
-
-}
-
 START_TEST(test_ws_frag_looped)
 {
-	int offset, mask = 0;
-	uint64_t copied;
-	uint64_t test_size;
-	unsigned char *p_test_data;
-	char *p_mask = test_items[_i].mask;
-	test_size = test_items[_i].test_size;
-	mask = (p_mask[0]!=0||p_mask[1]!=0||p_mask[2]!=0||p_mask[3]!=0) ?  4 : 0;
-	p_test_data = calloc(1, test_size + 256);
+	int offset;
+	unsigned char *p_mask = test_items[_i].mask;
+	uint64_t copied, test_size = test_items[_i].test_size;
 	ws_frag_pt p_local = ws_frag_ctor();
-	p_test_data[0] = 0x83;
-	if(test_size < 126) {
-		offset = 2 + mask;
-		p_test_data[1] = (unsigned char)(test_size & 0x7F);
-		if(mask) {
-			p_test_data[2] = p_mask[0];
-			p_test_data[3] = p_mask[1];
-			p_test_data[4] = p_mask[2];
-			p_test_data[5] = p_mask[3];
-		}
-		load_random(test_size, &p_test_data[offset]);
-	}
-	else if(test_size >= 126 && test_size < 65536) {
-		offset = 4 + mask;
-		p_test_data[1] = 126;
-		p_test_data[2] = (unsigned char)(test_size >> 8) & 0xFF;
-		p_test_data[3] = (unsigned char)test_size & 0xFF;
-		if(mask) {
-			p_test_data[4] = p_mask[0];
-			p_test_data[5] = p_mask[1];
-			p_test_data[6] = p_mask[2];
-			p_test_data[7] = p_mask[3];
-		}
-		load_random(test_size, &p_test_data[offset]);
-	}
-	else {
-		offset = 10 + mask;
-		p_test_data[1] = 127;
-		p_test_data[2] = (unsigned char)((test_size >> 56) & 0xFF);
-		p_test_data[3] = (unsigned char)((test_size >> 48) & 0xFF);
-		p_test_data[4] = (unsigned char)((test_size >> 40) & 0xFF);
-		p_test_data[5] = (unsigned char)((test_size >> 32) & 0xFF);
-		p_test_data[6] = (unsigned char)((test_size >> 24) & 0xFF);
-		p_test_data[7] = (unsigned char)((test_size >> 16) & 0xFF);
-		p_test_data[8] = (unsigned char)((test_size >> 8) & 0xFF);
-		p_test_data[9] = (unsigned char)(test_size & 0xFF);
-		if(mask) {
-			p_test_data[10] = p_mask[0];
-			p_test_data[11] = p_mask[1];
-			p_test_data[12] = p_mask[2];
-			p_test_data[13] = p_mask[3];
-		}
-		load_random(test_size, &p_test_data[offset]);
-	}
-	if(mask) p_test_data[1] |= 0x80;
+	unsigned char *p_test_data = ws_make_test_buffer(test_size, 0x83, test_items[_i].mask, &offset);
 	copied = ws_frag_append_chunk(p_local, p_test_data, test_size + offset);
 	ck_assert(copied == test_size + offset);
 	ck_assert_int_eq(p_local->frag_in, test_size + offset);
 	ck_assert(p_local->p_frag != NULL);
-	log_packet(p_test_data, p_local->p_frag);
 	ck_assert(ws_frag_is_valid(p_local) != 0);
 	ck_assert_msg(p_local->payload.len == test_size, 
 		"failed: 0x%lx ne expected 0x%lx", p_local->payload.len, test_size);
-	if(mask) {
+	if(p_mask[0]!=0||p_mask[1]!=0||p_mask[2]!=0||p_mask[3]!=0) {
 		unsigned char *p = (unsigned char*)p_local->p_payload;
 		for(int i = 0; i < test_size; i++) {
 			p[i] ^= p_mask[(i & 0x3)];
@@ -239,10 +161,30 @@ main(void)
 	SRunner *sr;
 	s = suite();
 	sr = srunner_create(s);
-	srunner_set_log (sr, "ws_frag.log");
+	srunner_set_log (sr, "ws_frag2.log");
 	srunner_run_all(sr, CK_NORMAL);
 	number_failed = srunner_ntests_failed(sr);
 	srunner_free(sr);
 	return (number_failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
+
+#if 0
+#include <stdio.h>
+static void
+log_packet(unsigned char *inp, unsigned char *inp2) {
+	FILE *fp = fopen("blob", "a+");
+	if(fp) {
+		for(int i = 0; i < 16; i++) {
+			fprintf(fp, "%02x ", *(inp+i));
+		}
+		fprintf(fp, "\n");
+		for(int i = 0; i < 16; i++) {
+			fprintf(fp, "%02x ", *(inp+i));
+		}
+		fprintf(fp, "\n\n");
+		fclose(fp);
+	}
+
+}
+#endif
 
