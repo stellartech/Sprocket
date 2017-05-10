@@ -4,6 +4,7 @@
 #ifndef WS_FRAME_BUFFER_H_INCLUDED
 #define WS_FRAME_BUFFER_H_INCLUDED
 
+#include <stdint.h>
 #include <event2/buffer.h>
 
 #ifdef __cplusplus
@@ -76,7 +77,7 @@ ws_frame_buffer_free(void*);
 void
 ws_frame_buffer_dtor(ws_frame_buffer_pt *inpp_self);
 
-int
+int64_t
 ws_frame_append(ws_frame_buffer_pt p_self, struct evbuffer *inp_evbuufer);
 
 #ifdef __cplusplus

@@ -48,95 +48,95 @@ ws_frame_buffer_dtor(ws_frame_buffer_pt *inpp_self)
 	}
 }
 
-static int
+static int64_t
 ws_frame_payload_len(ws_frame_buffer_pt inp_self)
 {
 	if(inp_self) {
 		if(inp_self->mask == 0) {
 			switch(inp_self->type) {
-			case 1: return (int)(inp_self->preamble.short_len & 0x7f);
-			case 2: return (int)inp_self->preamble.extended.len126.len;
-			case 3: return (int)inp_self->preamble.extended.len127.len;
-			default: return -1;
+			case 1: return (int64_t)(inp_self->preamble.short_len & 0x7f);
+			case 2: return (int64_t)inp_self->preamble.extended.len126.len;
+			case 3: return (int64_t)inp_self->preamble.extended.len127.len;
+			default: return (int64_t)-1;
 			}
 		}
 		else {
 			switch(inp_self->type) {
-			case 1: return (int)(inp_self->preamble.short_len & 0x7f);
-			case 2: return (int)inp_self->preamble.extended.m_len126.len.len;
-			case 3: return (int)inp_self->preamble.extended.m_len127.len.len;
-			default: return -1;
+			case 1: return (int64_t)(inp_self->preamble.short_len & 0x7f);
+			case 2: return (int64_t)inp_self->preamble.extended.m_len126.len.len;
+			case 3: return (int64_t)inp_self->preamble.extended.m_len127.len.len;
+			default: return (int64_t)-2;
 			}
 		}
 	}
-	return -2;
+	return (int64_t)-3;
 }
 
-static int 
+static void 
 ws_frame_append_process_type(ws_frame_buffer_pt inp_self)
 {
-	unsigned char short_len = 0;
-	size_t len = evbuffer_get_length(inp_self->p_evbuffer);
-	ev_ssize_t copied = evbuffer_copyout(inp_self->p_evbuffer, &inp_self->preamble, sizeof(ws_frame_preamble_t));
-	if(copied > 1) {
-		short_len = inp_self->preamble.short_len & 0x7f;
-		inp_self->mask =  ((inp_self->preamble.short_len & 0x80) == 0x80) ? 4 : 0;
-		if(short_len < 126) {
-			inp_self->offset = 2;
-			inp_self->mask =  ((inp_self->preamble.short_len & 0x80) == 0x80) ? 4 : 0;
-			inp_self->type = 1;
+	if(inp_self && inp_self->type > 0) return;
+	else {
+		unsigned char short_len = 0;
+		int64_t len = (int64_t)evbuffer_get_length(inp_self->p_evbuffer);
+		ev_ssize_t copied = evbuffer_copyout(inp_self->p_evbuffer, 
+					&inp_self->preamble, sizeof(ws_frame_preamble_t));
+		if(copied > 1) {
+			short_len = inp_self->preamble.short_len & 0x7fU;
+			inp_self->mask =  ((inp_self->preamble.short_len & 0x80U) == 0x80U) ? 4 : 0;
+			if(short_len < 126) {
+				inp_self->offset = 2;
+				inp_self->type = 1;
+			}
 		}
-	}
-	if(copied > 3) {
-		if(short_len == 126) {
+		if(copied > 3 && short_len == 126) {
 			inp_self->offset = 4;
 			inp_self->type = 2;
 		}
-	}
-	if(copied > 9) {
-		if(short_len == 127) {
+		if(copied > 9 && short_len == 127) {
 			inp_self->offset = 10;
 			inp_self->type = 3;
 		}
 	}
-	return copied;
 }
 
-static void
+static int64_t 
 ws_frame_append_process_length(ws_frame_buffer_pt inp_self)
 {
-	int buffer_len = evbuffer_get_length(inp_self->p_evbuffer);
-	int payload_len = ws_frame_payload_len(inp_self);
-	int total_len = payload_len + inp_self->offset + inp_self->mask;
+	int64_t buffer_len = evbuffer_get_length(inp_self->p_evbuffer);
+	int64_t payload_len = ws_frame_payload_len(inp_self);
+	int64_t total_len = payload_len + inp_self->offset + inp_self->mask;
 	if(buffer_len >= total_len) {
 		inp_self->complete = 1;
 	} 		
 	if(buffer_len > total_len) {
 		// Unlikely but handle any overflow that crept into this buffer space.
 		// ToDo. Not obvious how to trim some "excess" bytes from a evbuffer 
-		// using it's API. More research here to close off this edge case.
+		// whilst maintaining the zero-copy concept using it's API. 
+		// More research here to close off this edge case.
 		// But it does mean the next incoming message is now mangled beyond
 		// repair as we have part of it's beginning!
 	}
+	return (int64_t)(buffer_len - total_len); // Remainder, if any.
 }
 
-int
+int64_t
 ws_frame_append(ws_frame_buffer_pt inp_self, struct evbuffer *inp_evbuffer)
 {
-	if(!inp_self) return -1;
+	if(!inp_self) return (int64_t)-1;
 	if(!inp_self->p_evbuffer) {
-		if(!(inp_self->p_evbuffer = evbuffer_new())) return -2;
+		if(!(inp_self->p_evbuffer = evbuffer_new())) return (int64_t)-2;
 		if(!(evbuffer_add_buffer(inp_self->p_evbuffer, inp_evbuffer))) {
 			evbuffer_free(inp_self->p_evbuffer);
 			inp_self->p_evbuffer = NULL;
-			return -3;
+			return (int64_t)-3;
 		}
 	}
 	else {
 		if(!(evbuffer_add_buffer(inp_self->p_evbuffer, inp_evbuffer))) {
 			evbuffer_free(inp_self->p_evbuffer);
 			inp_self->p_evbuffer = NULL;
-			return -4;
+			return (int64_t)-4;
 		}
 	}
 	if(inp_self->type == 0) {
