@@ -6,6 +6,7 @@
 
 #include <stdint.h>
 #include <event2/buffer.h>
+#include <nanomsg/nn.h>
 
 #ifdef __cplusplus
 extern C {
@@ -58,6 +59,7 @@ typedef struct _ws_frame_buffer
 	int type : 3;
 	int mask : 3;
 	int offset : 4;
+	void *p_nn_msg;
 	ws_frame_preamble_t preamble;	
 	struct evbuffer *p_evbuffer;
 	struct _ws_frame_buffer *p_next;

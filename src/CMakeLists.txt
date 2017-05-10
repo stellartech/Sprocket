@@ -21,6 +21,7 @@ SET(sprocket_SRCS
 	buffer.c
 	queue.c
 	thpool.c
+	ws_wire.c
 )
   
 ADD_LIBRARY(sprocket

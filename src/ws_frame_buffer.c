@@ -107,6 +107,16 @@ ws_frame_append_process_length(ws_frame_buffer_pt inp_self)
 	int64_t payload_len = ws_frame_payload_len(inp_self);
 	int64_t total_len = payload_len + inp_self->offset + inp_self->mask;
 	if(buffer_len >= total_len) {
+		// We have a copy of the preamble so can remove that from the evbuffer
+		// to just leave the raw message data in their.
+		char trash[16];
+		evbuffer_remove(inp_self->p_evbuffer, trash, (inp_self->offset + inp_self->mask) & 0x0f);
+		// We can now drain the evbuffer into an allocated nn buffer. It would be greate if we
+		// could steal the void* from evbuffer but since it segments in chains there's potentially
+		// no single buffer to do this.
+		inp_self->p_nn_msg = nn_allocmsg(payload_len, 0);
+		evbuffer_remove(inp_self->p_evbuffer, inp_self->p_nn_msg, payload_len);
+		// Mark this frame as complete.
 		inp_self->complete = 1;
 	} 		
 	if(buffer_len > total_len) {
