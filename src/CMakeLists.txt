@@ -22,6 +22,7 @@ SET(sprocket_SRCS
 	queue.c
 	thpool.c
 	ws_wire.c
+	ipaddr.c
 )
   
 ADD_LIBRARY(sprocket
