@@ -25,13 +25,6 @@ TARGET_LINK_LIBRARIES(sprocket_server
 	sprocket
 )
   
-SET(epoll_SRCS
-	epoll.c
-)
-ADD_EXECUTABLE(epoll
-	${epoll_SRCS}
-)
-
 #CONFIGURE_FILE (pkgconfig.in ${PROJECT_NAME}.pc @ONLY)
 #INSTALL (
 #    FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.pc

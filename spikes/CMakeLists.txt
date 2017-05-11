@@ -7,45 +7,18 @@ SET(CMAKE_LIBRARY_PATH ${CMAKE_LIBRARY_PATH}
 	/usr/lib
 )
   
-SET(sprocket_SRCS
-	ws_ht_parser.c
-	ws_magic.c
-	ws_frame_buffer.c
-	ws_frame.c
-	ws_frag.c
-	ws_msg.c
-	listener.c
-	hashmap.c
-	base64.c
-	llist.c
-	buffer.c
-	queue.c
-	thpool.c
-	ws_wire.c
-	ipaddr.c
-	tcp_sock_server.c
-	conn.c
-)
-  
-ADD_LIBRARY(sprocket
-    ${sprocket_SRCS}
-)
-  
+INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/src)
+
 SET_TARGET_PROPERTIES(${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
 SET_TARGET_PROPERTIES(${PROJECT_NAME} PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
 SET_TARGET_PROPERTIES(${PROJECT_NAME} PROPERTIES ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
 
-TARGET_LINK_LIBRARIES(sprocket
-	ssl
-	config
-	crypto
-	jansson
-	nanomsg
-	pthread
-	http_parser
-	event
-	event_extra
-	event_openssl
-	event_pthreads
-)
-  
+ADD_EXECUTABLE(epoll epoll.c)
+TARGET_LINK_LIBRARIES(epoll sprocket)
+
+ADD_EXECUTABLE(conf conf.c)
+TARGET_LINK_LIBRARIES(conf sprocket)
+
+ADD_EXECUTABLE(tcps tcps.c)
+TARGET_LINK_LIBRARIES(tcps sprocket)
+
