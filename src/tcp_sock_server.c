@@ -1,5 +1,6 @@
 
 
+#include <errno.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
@@ -91,38 +92,32 @@ tcp_sock_server_bind(tcp_sock_server_pt inp_self)
 // Compile fails here.
 // We need to decide if we are going to run two epolls, one for accepting new conns and one for handling them
 int
-tcp_sock_server_event(tcp_sock_server_pt inp_self, struct epoll_event *inp_event)
+tcp_sock_server_event(tcp_sock_server_pt inp_self, int in_efd, struct epoll_event *inp_event)
 {
+	int fd, addr_len;
+	struct sockaddr addr;
 	if(!inp_self) return -1;
-	if(inp_self->epoll_fd == 0) return -3;
-	if(in_fd == 0) return -3;
-	if(in_fd == inp_self->epoll_fd) {
-		conn_pt p_conn;
-		int in_fd, in_addr_len;
-		struct sockaddr in_addr;
-		in_fd == accept(in_epoll_fd, &in_addr, &in_addr_len);
-		if(in_fd == -1) {
-			if(inp_self->p_err_cb) {
-				(inp_self->p_err_cb)(inp_self, in_fd, &in_addr, in_addr_len, inp_self->p_userdata);
+	if(inp_self->epoll_fd != in_efd) return -1;
+	while(1) {
+		fd = accept(in_efd, &addr, &addr_len);
+		if(fd == -1) {
+			if(errno == EAGAIN || errno == EWOULDBLOCK) {
+				// All incoming connections processed.
+				return 0;
 			}
-			return -3;
+			else {
+				// Error callback.
+				(inp_self->p_err_cb)(inp_self, fd, &addr, addr_len, inp_self->p_userdata);
+				return 0;
+			}
 		}
-		p_conn = conn_ctor(inp_self->epoll_fd, in_fd, &in_addr, in_addr_len, inp_self);
-		if(p_conn) {
-			struct epoll_event d;
-			d.data.ptr = p_conn;
-			d.events = EPOLLIN | EPOLLOUT | EPOLLHUP;
-			epoll_ctl(inp_self->epoll_fd, EPOLL_CTL_ADD, in_fd, &d);
-		}
-		// ToDo, once we have conn_t defined we should come back here to create a new 
-		// conn object that is hooked up to the epoll system.
 		else {
-			close(in_fd);	
+			if(inp_self->p_acc_cb) {
+				// Callback to accept handler.
+				(inp_self->p_acc_cb)(inp_self, fd, &addr, addr_len, inp_self->p_userdata);
+			}
+			else close(fd);
 		}
-	}
-	else {
-		conn_pt p_conn = (conn_pt)inp_event->data.ptr;	
-		// Despatch event to conn handler. Or, make a defered function call to teh thread pool. tbd.
 	}
 	return 0;
 }

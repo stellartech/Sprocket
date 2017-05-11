@@ -18,7 +18,7 @@ typedef struct _tcp_sock_server * tcp_sock_server_pt;
   
 typedef void (*p_tcp_sock_server_cb)(
 	tcp_sock_server_pt inp_tcp_sock, 
-	int in_fd,
+	int fd,
 	struct sockaddr *inp_sockaddr,
 	int in_sockaddr_len,
 	void* inp_userdata
