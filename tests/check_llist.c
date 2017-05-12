@@ -206,6 +206,43 @@ START_TEST(test_llist_deletel__bot)
 }
 END_TEST
 
+START_TEST(test_llist_iter)
+{
+	int rval;
+	char *p_val;
+	const char *p_key;
+	
+	// Notice that inserting is a push_front operation,
+	// the iterated list is backwards to how inserted.
+	llist_iterator_pt p_iter = LLIST_IF(p)->iterator_new(p);
+	p_key = LLIST_IF(p)->iterator_key(p_iter);
+	p_val = LLIST_IF(p)->iterator_current(p_iter);
+	ck_assert_str_eq(p_key, "idx4");
+	ck_assert_str_eq(p_val, "element4");
+	rval = LLIST_IF(p)->iterator_forward(p_iter);
+	ck_assert_int_eq(rval, 1);
+	p_key = LLIST_IF(p)->iterator_key(p_iter);
+	p_val = LLIST_IF(p)->iterator_current(p_iter);
+	ck_assert_str_eq(p_key, "idx3");
+	ck_assert_str_eq(p_val, "element3");
+	rval = LLIST_IF(p)->iterator_forward(p_iter);
+	ck_assert_int_eq(rval, 1);
+	p_key = LLIST_IF(p)->iterator_key(p_iter);
+	p_val = LLIST_IF(p)->iterator_current(p_iter);
+	ck_assert_str_eq(p_key, "idx2");
+	ck_assert_str_eq(p_val, "element2");
+	rval = LLIST_IF(p)->iterator_forward(p_iter);
+	ck_assert_int_eq(rval, 1);
+	p_key = LLIST_IF(p)->iterator_key(p_iter);
+	p_val = LLIST_IF(p)->iterator_current(p_iter);
+	ck_assert_str_eq(p_key, "idx1");
+	ck_assert_str_eq(p_val, "element1");
+	rval = LLIST_IF(p)->iterator_forward(p_iter);
+	ck_assert_int_eq(rval, 0);
+	LLIST_IF(p)->iterator_free(p_iter);
+}
+END_TEST
+
 Suite *suite()
 {
 	Suite *s;
@@ -231,6 +268,7 @@ Suite *suite()
 	tcase_add_test(tc_core, test_llist_deletel__top);
 	tcase_add_test(tc_core, test_llist_deletel__mid);
 	tcase_add_test(tc_core, test_llist_deletel__bot);
+	tcase_add_test(tc_core, test_llist_iter);
 	suite_add_tcase(s, tc_core);
 
 	return s;

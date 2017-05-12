@@ -23,8 +23,8 @@ SET(sprocket_SRCS
 	thpool.c
 	ws_wire.c
 	ipaddr.c
-	tcp_sock_server.c
-	conn.c
+	tcp_server/tcp_sock_server.c
+	tcp_server/server_conn.c
 )
   
 ADD_LIBRARY(sprocket

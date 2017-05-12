@@ -1,37 +1,14 @@
 
 
-#include <arpa/inet.h>
+
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
-#define IPADDR_FRIEND_OF
-#include "../src/ipaddr.h"
-
-int
-main(int argc, char *argv[])
-{
-	char str[INET6_ADDRSTRLEN];
-	ipaddr_pt ip = ipaddr_ctor("0.0.0.0", 443);
-
-
-	printf("IP: %s:%d\n", ip->ip_str, ip->port);
-
-	inet_ntop(ip->domain, &ip->in6_addr_buf, str, INET6_ADDRSTRLEN);
-	printf("IP: %s:%d\n", str, ip->port);
-
-	ipaddr_free(ip);
-	return 0;
-
-}
-
-#if 0
-#include <stdio.h>
+#define FRIEND_OF_SERVER_CONN
+#include "../src/tcp_server/server_conn.h"
 
 int main(int argc, char** argv) 
 {
-	printf("Hello World\n");
+	printf("Hello World %ld %016x\n", sizeof(server_conn_t), 1234);
 	return 0;	
 }
-#endif
 

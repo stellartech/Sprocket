@@ -8,6 +8,9 @@
 
 #include <arpa/inet.h>
 
+#include "../llist.h"
+#include "../hashmap.h"
+
 #ifdef __cplusplus
 extern C {
 #endif
@@ -16,6 +19,7 @@ struct _tcp_sock_server;
 typedef struct _tcp_sock_server   tcp_sock_server_t;
 typedef struct _tcp_sock_server * tcp_sock_server_pt;
   
+// Callback function pointer definition.
 typedef void (*p_tcp_sock_server_cb)(
 	tcp_sock_server_pt inp_tcp_sock, 
 	int fd,
@@ -23,6 +27,54 @@ typedef void (*p_tcp_sock_server_cb)(
 	int in_sockaddr_len,
 	void* inp_userdata
 );
+
+#define FRIEND_OF_SERVER_CONN
+#include "server_conn.h"
+
+// Read callback function pointer prototype.
+typedef int (*tcp_sock_server_read_cb)(
+	tcp_sock_server_pt p_sock_server,
+	server_conn_pt p_server_conn
+);
+// Write callback function pointer prototype.
+typedef int (*tcp_sock_server_write_cb)(
+	tcp_sock_server_pt p_sock_server,
+	server_conn_pt p_server_conn
+);
+// Error callback function pointer prototype.
+typedef int (*tcp_sock_server_error_cb)(
+	tcp_sock_server_pt p_sock_server,
+	server_conn_pt p_server_conn
+);
+// Pulse callback function pointer prototype.
+typedef int (*tcp_sock_server_pulse_cb)(
+	tcp_sock_server_pt p_sock_server,
+	server_conn_pt p_server_conn
+);
+// Accept callback function pointer prototype.
+typedef int (*tcp_sock_server_accept_cb)(
+	tcp_sock_server_pt p_sock_server,
+	int fd,
+	struct sockaddr *p_addr,
+	int add_len
+);
+// Closing callback function pointer prototype.
+typedef int (*tcp_sock_server_closing_cb)(
+	tcp_sock_server_pt p_sock_server,
+	server_conn_pt p_server_conn
+);
+
+// Group of named callbacks, name is required.
+typedef struct
+{
+	char p_name[32]; // This is used as the llist key.
+	tcp_sock_server_read_cb p_read_cb;
+	tcp_sock_server_write_cb p_write_cb;
+	tcp_sock_server_error_cb p_error_cb;
+	tcp_sock_server_pulse_cb p_pulse_cb;
+	tcp_sock_server_accept_cb p_accept_cb;
+	tcp_sock_server_closing_cb p_closing_cb;
+} tcp_sock_server_callback_t, *tcp_sock_server_callback_pt;
 
 #ifdef TCP_SOCK_SERVER_FRIEND 
 struct _tcp_sock_server
@@ -43,10 +95,10 @@ struct _tcp_sock_server
         char ip_str[INET6_ADDRSTRLEN + 1];
         //! Underlying socket data structure.
         struct sockaddr_in6 in6_addr_buf;
-        //! Socket accept callback.
-        p_tcp_sock_server_cb p_acc_cb;
-        //! Socket error callback;
-        p_tcp_sock_server_cb p_err_cb;
+	//! List of callback listeners
+	llist_pt p_list_listeners;
+	//! List of connections.
+	hashmap_pt p_hash_conns;
         //! Opaque user data pointer
         void *p_userdata;
         //! User data int
@@ -69,10 +121,6 @@ tcp_sock_server_get_fd(tcp_sock_server_pt inp_self);
 int
 tcp_sock_server_bind(tcp_sock_server_pt inp_self);
 
-int
-tcp_sock_server_accept(tcp_sock_server_pt inp_self, 
-	int in_epoll_fd);
-
 tcp_sock_server_pt
 tcp_sock_server_set_epoll_fd(tcp_sock_server_pt inp_self,
 	int in_efd);
@@ -80,14 +128,6 @@ tcp_sock_server_set_epoll_fd(tcp_sock_server_pt inp_self,
 tcp_sock_server_pt
 tcp_sock_server_set_port(tcp_sock_server_pt inp_self, 
 	short in_port);
-
-tcp_sock_server_pt
-tcp_sock_server_set_acc_cb(tcp_sock_server_pt inp_self, 
-	p_tcp_sock_server_cb inp_ptr);
-
-tcp_sock_server_pt
-tcp_sock_server_set_err_cb(tcp_sock_server_pt inp_self, 
-	p_tcp_sock_server_cb inp_ptr);
 
 tcp_sock_server_pt
 tcp_sock_server_set_ip(tcp_sock_server_pt inp_self, 
@@ -100,6 +140,10 @@ tcp_sock_server_set_userdata(tcp_sock_server_pt inp_self,
 tcp_sock_server_pt
 tcp_sock_server_conf(tcp_sock_server_pt inp_self, 
 	const char *inp_conf_filename);
+
+int
+tcp_sock_server_add_listener(tcp_sock_server_pt inp_self,
+        tcp_sock_server_callback_pt inp_cb);
 
 #ifdef __cplusplus
 }

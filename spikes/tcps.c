@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <unistd.h>
 
-#include "../src/tcp_sock_server.h"
+#include "tcp_sock_server.h"
 
 
 static void
@@ -24,11 +24,10 @@ acc(tcp_sock_server_pt inp_server,
 int main(int argc, char** argv) 
 {
 	tcp_sock_server_pt p_server = tcp_sock_server_ctor(NULL);
-
 	tcp_sock_server_set_ip(p_server, "0.0.0.0");
 	tcp_sock_server_set_port(p_server, 8080);
-	tcp_sock_server_set_acc_cb(p_server, acc);
-	tcp_sock_server_set_err_cb(p_server, acc);
+	//tcp_sock_server_set_acc_cb(p_server, acc);
+	//tcp_sock_server_set_err_cb(p_server, acc);
 	tcp_sock_server_bind(p_server);
 
 	printf("Hello World\n");
