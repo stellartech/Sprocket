@@ -13,9 +13,7 @@ main(int argc, char *argv[])
 	listener_pt p_listener;
 
 
-	//p_listener = listener_ctor("0.0.0.0", 8081);
-	p_listener = listener_ctor("172.17.0.2", 8081);
-	//p_listener = listener_ctor("127.0.0.1", 8081);
+	p_listener = listener_ctor("0.0.0.0", 8081);
 	if(!p_listener) {
 		printf("Failed ctor()\n");
 		return 0;
@@ -29,7 +27,7 @@ main(int argc, char *argv[])
 	listener_set_backlog(p_listener, 1024);
 	listener_listen(p_listener);
 
-	printf("Hello world\n");
+	printf("Listening on fd %d, presss spacebar to terminate.\n", listener_get_fd(p_listener));
 	getchar();
 
 	listener_dtor(&p_listener);
