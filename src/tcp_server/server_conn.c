@@ -53,7 +53,6 @@ server_conn_ctor(server_conn_ctor_args_pt inp_args)
 		server_conn_lock(p_self);
 		p_self->refcount = 1;
 		p_self->epoll_sock_fd = inp_args->epoll_sock_fd;
-		p_self->epoll_close_fd = inp_args->epoll_close_fd;
 		p_self->epoll_timer_fd = inp_args->epoll_timer_fd;
 		p_self->in_addr_len = inp_args->in_addr_len;
 		p_self->p_userdata = inp_args->p_userdata;
@@ -82,17 +81,6 @@ server_conn_ctor(server_conn_ctor_args_pt inp_args)
 			d.data.ptr = p_self;
 			d.events = EPOLLIN | EPOLLOUT | EPOLLHUP;
 			if((epoll_ctl(inp_args->epoll_sock_fd, EPOLL_CTL_ADD, inp_args->in_fd, &d)) == -1)
-				goto server_conn_ctor_failed;
-		}
-		else {
-			goto server_conn_ctor_failed;
-		}
-		if(inp_args->epoll_close_fd > 0) {
-			struct epoll_event d;
-			d.data.ptr = p_self;
-			d.events = EPOLLIN;
-			p_self->close_fd = eventfd(0, EFD_NONBLOCK);
-			if((epoll_ctl(inp_args->epoll_close_fd, EPOLL_CTL_ADD, p_self->close_fd, &d)) == -1)
 				goto server_conn_ctor_failed;
 		}
 		else {
@@ -143,10 +131,6 @@ server_conn_dtor(server_conn_pt *inp_server_conn)
 				p_self->sock_fd, NULL);
 		}
 		if(p_self->sock_fd) close(p_self->sock_fd);
-		if(p_self->epoll_close_fd && p_self->close_fd) {
-			epoll_ctl(p_self->epoll_close_fd, EPOLL_CTL_DEL,
-				p_self->close_fd, NULL);
-		}
 		if(p_self->close_fd) close(p_self->sock_fd);
 		server_conn_unlock(p_self);
 		pthread_mutex_destroy(&p_self->lock);

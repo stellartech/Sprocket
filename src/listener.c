@@ -1,65 +1,121 @@
- 
+/*********************************************************************************
+ *   Copyright (c) 2008-2017 Andy Kirkham  All rights reserved.
+ *
+ *   Permission is hereby granted, free of charge, to any person obtaining a copy
+ *   of this software and associated documentation files (the "Software"),
+ *   to deal in the Software without restriction, including without limitation
+ *   the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ *   and/or sell copies of the Software, and to permit persons to whom
+ *   the Software is furnished to do so, subject to the following conditions:
+ *
+ *   The above copyright notice and this permission notice shall be included
+ *   in all copies or substantial portions of the Software.
+ *
+ *   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ *   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ *   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+ *   THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ *   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *   FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *   IN THE SOFTWARE.
+ ***********************************************************************************/
 
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
 
 #include "listener.h"
 
 struct _listener
 {
-	int backlog;	// Passed to the listen() call to determine the length of the
-			// acceptable connection backlog.  Set to -1 for a reasonable default.
+	//! The listening socket file descriptor
+	int fd;
+	//! AF_INET or AF_INET6
+	int domain;
+	//! Socket options at bind time.
+	int sock_opts;
+	//! Socket backlog for listen()
+	int backlog;
+	//! String of user supplied bind addr
+	const char ip[INET6_ADDRSTRLEN];
+	//! Opening flags.
 	unsigned flags; // Any number of LEV_OPT_* flags
-
-	short port;
-	int socklen;
-	struct sockaddr_in sin;
-	struct event_base *p_event_base;
-	struct evconnlistener *p_evconnlistener;
-
-	evconnlistener_cb p_accept_cb;
-	evconnlistener_errorcb p_error_cb;
-
+	//! Sock struct
+	union {
+		struct sockaddr_in addr_buf4;
+		struct sockaddr_in6 addr_buf6;
+	} sock;
+	//! Length of addr_buf above.
+	int addr_buf_len;
 };
 
 int
 listener_bind(listener_pt inp_self)
 {
 	if(inp_self) {
-		if(inp_self->p_evconnlistener) {
-			evconnlistener_free(inp_self->p_evconnlistener);
-		}
-		inp_self->p_evconnlistener = evconnlistener_new_bind(
-			inp_self->p_event_base, 
-			inp_self->p_accept_cb, (void*)inp_self,
-			inp_self->flags, 
-			inp_self->backlog,
-			(struct sockaddr*)&inp_self->sin, 
-			sizeof(struct sockaddr)); 
-		if(inp_self->p_evconnlistener == NULL) {
+		int fd, on = 1, len = 0, rc = 0;
+		if(0 > (fd = socket(inp_self->domain, SOCK_STREAM | SOCK_NONBLOCK, 0))) {
 			return -1;
 		}
-		else if(inp_self->p_error_cb)  {
-			evconnlistener_set_error_cb(inp_self->p_evconnlistener, 
-				inp_self->p_error_cb);
+		if(0 > setsockopt(fd, SOL_SOCKET, inp_self->sock_opts, (void*)&on, sizeof(on))) {
+			close(fd);
+			return -2;
 		}
+		if(inp_self->domain == AF_INET) {
+			len = sizeof(struct sockaddr_in);
+			rc = bind(fd, (struct sockaddr *)&inp_self->sock.addr_buf4, len);
+		}
+		else {
+			len = sizeof(struct sockaddr_in6);
+			rc = bind(fd, (struct sockaddr *)&inp_self->sock.addr_buf6, len);
+		}
+		if(rc != 0) {
+			close(fd);
+			return -3;
+		}
+		inp_self->fd = fd;
 	}
-	return 0;
+	return inp_self->fd;
 }
 
+int
+listener_listen(listener_pt inp_self)
+{
+	if(inp_self && inp_self->fd) {
+		return listen(inp_self->fd, inp_self->backlog);
+	}
+	return -4;
+}
 
 listener_pt
-listener_ctor(struct event_base *inp_event_base, 
-	evconnlistener_cb inp_accept_cb,
-	evconnlistener_errorcb inp_error_cb)
+listener_set_backlog(listener_pt inp_self, int in_backlog)
+{
+	if(inp_self) {
+		inp_self->backlog = in_backlog;
+	}
+	return inp_self;
+}
+
+listener_pt
+listener_ctor(const char *inp_ip, short in_port)
 {
 	listener_pt p_self = calloc(1, sizeof(listener_t));
 	if(p_self) {
-		p_self->p_accept_cb = inp_accept_cb;
-		p_self->p_error_cb = inp_error_cb;
-		p_self->p_event_base = inp_event_base;
-		p_self->backlog = -1; // Default value.
-		p_self->flags = LEV_OPT_CLOSE_ON_FREE|LEV_OPT_REUSEABLE;
+		if(inp_ip != NULL && in_port > 0) {
+			if(listener_set_ipaddr(p_self, inp_ip) != 1) {
+				listener_free(p_self);
+				return NULL;
+			}
+			listener_set_port(p_self, in_port);
+		}
+		p_self->sock_opts = SO_REUSEADDR | 
+					SO_REUSEPORT |
+					SO_KEEPALIVE;
+		p_self->backlog = -1;
 	}
 	return p_self;
 }
@@ -68,31 +124,13 @@ void
 listener_free(listener_pt inp_self)
 {
 	if(inp_self) {
-		if(inp_self->p_evconnlistener) {
-			evconnlistener_free(inp_self->p_evconnlistener);
+		if(inp_self->fd) {
+			close(inp_self->fd);
+			inp_self->fd = 0;
 		}
 		free(inp_self);
 	}	
 }
-
-int
-listener_pause(listener_pt inp_self)
-{
-	if(inp_self && inp_self->p_evconnlistener) {
-		return evconnlistener_disable(inp_self->p_evconnlistener);
-	}
-	return -1;
-}
-
-int
-listener_resume(listener_pt inp_self)
-{
-	if(inp_self && inp_self->p_evconnlistener) {
-		return evconnlistener_enable(inp_self->p_evconnlistener);
-	}
-	return -1;
-}
-
 
 void
 listener_dtor(listener_pt *inpp_self)
@@ -104,16 +142,6 @@ listener_dtor(listener_pt *inpp_self)
 		}
 		*inpp_self = NULL;
 	}
-}
-
-
-listener_pt
-listener_set_backlog(listener_pt inp_self, int in_backlog)
-{
-	if(inp_self) {
-		inp_self->backlog = in_backlog;
-	}
-	return inp_self;
 }
 
 listener_pt
@@ -129,13 +157,39 @@ int
 listener_set_ipaddr(listener_pt inp_self, const char *inp_addr)
 {
 	if(inp_self) {
-		char buf[256];
-		int len = sizeof(struct sockaddr_in);
-		memset(&inp_self->sin, 0, sizeof(struct sockaddr_in));
-		return evutil_parse_sockaddr_port(inp_addr, 
-			(struct sockaddr*)&inp_self->sin, &len);
-	}	
+		int rc;
+		strncpy((char*)inp_self->ip, inp_addr, INET6_ADDRSTRLEN);
+		inp_self->domain = (strchr(inp_self->ip, ':') == NULL) ? AF_INET : AF_INET6;
+		if(inp_self->domain == AF_INET) {
+			inp_self->sock.addr_buf4.sin_family = AF_INET;
+			return inet_pton(AF_INET, inp_self->ip, &inp_self->sock.addr_buf4.sin_addr);
+		}
+		inp_self->sock.addr_buf6.sin6_family = AF_INET6;
+		return inet_pton(AF_INET6, inp_self->ip, &inp_self->sock.addr_buf6.sin6_addr);
+	}
 	return -2;
+
 }
 
+listener_pt
+listener_set_port(listener_pt inp_self, short in_port)
+{
+	if(inp_self) {
+		if(inp_self->domain == AF_INET) {
+			inp_self->sock.addr_buf4.sin_port = htons(in_port);
+			return inp_self;
+		}
+		inp_self->sock.addr_buf6.sin6_port = htons(in_port);
+	}
+	return inp_self;
+}
+
+int
+listener_get_fd(listener_pt inp_self) 
+{
+	if(inp_self) {
+		return inp_self->fd;
+	}
+	return -1;
+}
 

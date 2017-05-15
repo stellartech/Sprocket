@@ -85,8 +85,6 @@ struct _tcp_sock_server
 	int epoll_sock_fd;
 	//! Epoll event for timers
 	int epoll_timer_fd;
-	//! Epoll event for sock close
-	int epoll_close_fd;
         //! Socket domain (AF_NET or AF_NET6)
         int domain;
         //! The tcp/ip port to listen on.

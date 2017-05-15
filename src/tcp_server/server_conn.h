@@ -48,6 +48,11 @@ typedef enum {
 	eSERVER_CONN_CLOSED
 } eSERVER_CONN_STATE;
 
+typedef enum {
+	eSERVER_CONN_SOCK_EV = 0,
+	eSERVER_CONN_TIMER_EV
+} eSERVER_CONN_EVENT;
+
 #ifdef FRIEND_OF_SERVER_CONN
 struct _server_conn
 {
@@ -57,8 +62,6 @@ struct _server_conn
 	int timer_fd;
 	//! The parents central loop epoll sock fd
 	int epoll_sock_fd;
-	//! The parents central loop epoll close fd
-	int epoll_close_fd;
 	//! The parents central loop epoll timer fd
 	int epoll_timer_fd;
 	//! Signal to parent closure required
@@ -97,7 +100,6 @@ typedef struct
 {
 	int in_fd;
 	int epoll_sock_fd;
-	int epoll_close_fd;
 	int epoll_timer_fd;
 	struct sockaddr *inp_addr;
 	int in_addr_len;

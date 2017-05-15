@@ -51,8 +51,9 @@ hashmap_remove(hashmap_pt inp_self,
         const char *inp_key);
   
 int
-hashmap_delete(hashmap_pt inp_self, const char *inp_key);
-  
+hashmap_delete(hashmap_pt inp_self, 
+	const char *inp_key);
+
 #ifdef __cplusplus
 }
 #endif

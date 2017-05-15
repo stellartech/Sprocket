@@ -32,7 +32,6 @@ tcp_sock_server_ctor(const char *inp_conf_filename)
 		p_self->maxevents = 1024;
 		p_self->domain = AF_INET;
 		p_self->epoll_sock_fd = epoll_create1(EPOLL_CLOEXEC);
-		p_self->epoll_close_fd = epoll_create1(EPOLL_CLOEXEC);
 		p_self->epoll_timer_fd = epoll_create1(EPOLL_CLOEXEC);
 		p_self->p_list_listeners = llist_ctor(NULL);
 		p_self->p_hash_conns = hashmap_ctor(1024 * 16, server_conn_free);
@@ -59,10 +58,6 @@ tcp_sock_server_free(void *inp_self)
 		if(p_self->epoll_sock_fd) {
 			close(p_self->epoll_sock_fd);
 			p_self->epoll_sock_fd = 0;
-		}
-		if(p_self->epoll_close_fd) {
-			close(p_self->epoll_close_fd);
-			p_self->epoll_close_fd = 0;
 		}
 		if(p_self->epoll_timer_fd) {
 			close(p_self->epoll_timer_fd);
@@ -237,7 +232,6 @@ tcp_sock_server_accept(tcp_sock_server_pt inp_self, int in_type)
 			memset(&args, 0, sizeof(server_conn_ctor_args_t));
 		        args.in_fd = fd;
 			args.epoll_sock_fd = inp_self->epoll_sock_fd;
-			args.epoll_close_fd = inp_self->epoll_close_fd;
 			args.epoll_timer_fd = inp_self->epoll_timer_fd;
 			args.inp_addr = &addr;
         		args.in_addr_len = addr_len;
@@ -284,26 +278,30 @@ tcp_sock_server_accept(tcp_sock_server_pt inp_self, int in_type)
 static int
 tcp_sock_server_despatch(tcp_sock_server_pt inp_self, server_conn_pt inp_server)
 {
+	struct epoll_event event;
+
 	if(server_conn_close_requested(inp_server)) {
 		hashmap_delete(inp_self->p_hash_conns, &inp_server->fdstr[0]);
 		return 0;
 	}
 
 	// Requeue event
-	pev->events = EPOLLIN | EPOLLOUT | EPOLLHUP;
-	epoll_ctl (in_epoll_fd, EPOLL_CTL_ADD, p_server->sock_fd, pev);
+	event.data.ptr = inp_server;
+	event.events = EPOLLIN | EPOLLOUT | EPOLLHUP;
+	epoll_ctl (inp_self->epoll_sock_fd, EPOLL_CTL_ADD, inp_server->sock_fd, &event);
 	return 0;
 }
 
 static int
-tcp_sock_server_event_loop(tcp_sock_server_pt inp_self, 
-	int in_epoll_fd, int in_type,
+tcp_sock_server_event_loop_do(tcp_sock_server_pt inp_self, 
+	int in_epoll_fd, eSERVER_CONN_EVENT in_type,
 	struct epoll_event *inp_events)
 {
 	int n_events;
+	memset(inp_events, 0, inp_self->maxevents * sizeof(struct epoll_event));	
 	n_events = epoll_wait(in_epoll_fd, inp_events, inp_self->maxevents, 0);
 	for(int i = 0; i < n_events; i++) {
-		struct epoll_event *pev = &p_events[i];
+		struct epoll_event *pev = &inp_events[i];
 		if((pev->events & EPOLLERR) ||
 			(pev->events & EPOLLHUP) ||
 			(!(pev->events & EPOLLIN))) {
@@ -330,14 +328,27 @@ tcp_sock_server_event_loop(tcp_sock_server_pt inp_self,
 	return 0; // All is well.
 }
 
+void
 tcp_sock_server_event_loop_sock(tcp_sock_server_pt inp_self)
 {
 	int n_events;
 	struct epoll_event *p_events;
-	p_events = calloc(inp_self->maxevents, sizeof(struct epoll_event));
-	tcp_sock_server_event_loop(inp_self, inp_self->epoll_sock_fd, 1, p_events);
-	free(p_events);
+	p_events = malloc(inp_self->maxevents * sizeof(struct epoll_event));
+	if(p_events) {
+		tcp_sock_server_event_loop_do(inp_self, 
+			inp_self->epoll_sock_fd, 
+			eSERVER_CONN_SOCK_EV, 
+			p_events);
+		tcp_sock_server_event_loop_do(inp_self, 
+			inp_self->epoll_timer_fd, 
+			eSERVER_CONN_TIMER_EV, 
+			p_events);
+		free(p_events);
+	}
 }
+
+
+
 #ifdef __cplusplus
 }
 #endif
