@@ -82,7 +82,11 @@ struct _tcp_sock_server
         //! Listening socket file descriptor
         int fd;
 	//! Epoll event system fd
-	int epoll_fd;
+	int epoll_sock_fd;
+	//! Epoll event for timers
+	int epoll_timer_fd;
+	//! Epoll event for sock close
+	int epoll_close_fd;
         //! Socket domain (AF_NET or AF_NET6)
         int domain;
         //! The tcp/ip port to listen on.
@@ -91,6 +95,8 @@ struct _tcp_sock_server
         int sock_opts;
         //! Listener backlog
         int backlog;
+	//! Process maxevents per loop
+	int maxevents;
         //! The raw "human readable" IP address
         char ip_str[INET6_ADDRSTRLEN + 1];
         //! Underlying socket data structure.

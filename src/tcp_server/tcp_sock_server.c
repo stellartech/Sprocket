@@ -29,8 +29,11 @@ tcp_sock_server_ctor(const char *inp_conf_filename)
 			SO_REUSEPORT |
 			SO_KEEPALIVE;
 		p_self->backlog = 1024;
+		p_self->maxevents = 1024;
 		p_self->domain = AF_INET;
-		p_self->epoll_fd = epoll_create1(EPOLL_CLOEXEC);
+		p_self->epoll_sock_fd = epoll_create1(EPOLL_CLOEXEC);
+		p_self->epoll_close_fd = epoll_create1(EPOLL_CLOEXEC);
+		p_self->epoll_timer_fd = epoll_create1(EPOLL_CLOEXEC);
 		p_self->p_list_listeners = llist_ctor(NULL);
 		p_self->p_hash_conns = hashmap_ctor(1024 * 16, server_conn_free);
 		tcp_sock_server_conf(p_self, inp_conf_filename);
@@ -53,9 +56,17 @@ tcp_sock_server_free(void *inp_self)
 			close(p_self->fd);
 			p_self->fd = 0;
 		}
-		if(p_self->epoll_fd) {
-			close(p_self->epoll_fd);
-			p_self->epoll_fd = 0;
+		if(p_self->epoll_sock_fd) {
+			close(p_self->epoll_sock_fd);
+			p_self->epoll_sock_fd = 0;
+		}
+		if(p_self->epoll_close_fd) {
+			close(p_self->epoll_close_fd);
+			p_self->epoll_close_fd = 0;
+		}
+		if(p_self->epoll_timer_fd) {
+			close(p_self->epoll_timer_fd);
+			p_self->epoll_timer_fd = 0;
 		}
 		hashmap_dtor(&p_self->p_hash_conns);
 		free(inp_self);
@@ -113,15 +124,6 @@ tcp_sock_server_set_port(tcp_sock_server_pt inp_self, short in_port)
 	if(inp_self) {
 		inp_self->port = in_port;
 		inp_self->in6_addr_buf.sin6_port = htons(inp_self->port);
-	}
-	return inp_self;
-}
-
-tcp_sock_server_pt
-tcp_sock_server_set_epoll_fd(tcp_sock_server_pt inp_self, int in_efd)
-{
-	if(inp_self) {
-		inp_self->epoll_fd = in_efd;
 	}
 	return inp_self;
 }
@@ -211,7 +213,7 @@ tcp_sock_server_invoke_err_cb(tcp_sock_server_pt inp_self)
 }
 
 static int
-tcp_sock_server_accept(tcp_sock_server_pt inp_self)
+tcp_sock_server_accept(tcp_sock_server_pt inp_self, int in_type)
 {
 	int fd, addr_len;
 	struct sockaddr addr;
@@ -219,7 +221,7 @@ tcp_sock_server_accept(tcp_sock_server_pt inp_self)
 	while(1) {
 		addr_len = 0;
 		memset(&addr, 0, sizeof(struct sockaddr));
-		fd = accept(inp_self->epoll_fd, &addr, &addr_len);
+		fd = accept(inp_self->epoll_sock_fd, &addr, &addr_len);
 		if(fd == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
 			// All incoming connections processed.
 			return 0;
@@ -234,7 +236,9 @@ tcp_sock_server_accept(tcp_sock_server_pt inp_self)
 
 			memset(&args, 0, sizeof(server_conn_ctor_args_t));
 		        args.in_fd = fd;
-			args.epoll_fd = inp_self->epoll_fd;
+			args.epoll_sock_fd = inp_self->epoll_sock_fd;
+			args.epoll_close_fd = inp_self->epoll_close_fd;
+			args.epoll_timer_fd = inp_self->epoll_timer_fd;
 			args.inp_addr = &addr;
         		args.in_addr_len = addr_len;
         		args.p_userdata = NULL;
@@ -252,7 +256,7 @@ tcp_sock_server_accept(tcp_sock_server_pt inp_self)
 			// Hashmap "remove" allows to extract the p_server pointer without
 			// invoking the destructor. You are basically taking ownsership by
 			// doing this, now down to you to destroy it with dtor/free.
-			hashmap_insert(inp_self->p_hash_conns, p_server->p_fdstr, p_server);
+			hashmap_insert(inp_self->p_hash_conns, &p_server->fdstr[0], p_server);
 
 			{ // Accept callbacks
 				int rc = 0;
@@ -276,6 +280,64 @@ tcp_sock_server_accept(tcp_sock_server_pt inp_self)
 	return 0;
 }
 
+
+static int
+tcp_sock_server_despatch(tcp_sock_server_pt inp_self, server_conn_pt inp_server)
+{
+	if(server_conn_close_requested(inp_server)) {
+		hashmap_delete(inp_self->p_hash_conns, &inp_server->fdstr[0]);
+		return 0;
+	}
+
+	// Requeue event
+	pev->events = EPOLLIN | EPOLLOUT | EPOLLHUP;
+	epoll_ctl (in_epoll_fd, EPOLL_CTL_ADD, p_server->sock_fd, pev);
+	return 0;
+}
+
+static int
+tcp_sock_server_event_loop(tcp_sock_server_pt inp_self, 
+	int in_epoll_fd, int in_type,
+	struct epoll_event *inp_events)
+{
+	int n_events;
+	n_events = epoll_wait(in_epoll_fd, inp_events, inp_self->maxevents, 0);
+	for(int i = 0; i < n_events; i++) {
+		struct epoll_event *pev = &p_events[i];
+		if((pev->events & EPOLLERR) ||
+			(pev->events & EPOLLHUP) ||
+			(!(pev->events & EPOLLIN))) {
+			//Error condition.
+			server_conn_pt p_server = (server_conn_pt)pev->data.ptr;
+			if(p_server) {
+				hashmap_delete(inp_self->p_hash_conns, &p_server->fdstr[0]);
+				continue;
+			}
+		}
+		if((tcp_sock_server_pt)pev->data.ptr == inp_self) {
+			// New notification of connection.
+			tcp_sock_server_accept(inp_self, in_type);
+		}
+		else {
+			server_conn_pt p_server = (server_conn_pt)pev->data.ptr;
+			if(tcp_sock_server_despatch(inp_self, p_server) != 0) {
+				hashmap_delete(inp_self->p_hash_conns, &p_server->fdstr[0]);
+			}
+		}
+			
+		
+	}
+	return 0; // All is well.
+}
+
+tcp_sock_server_event_loop_sock(tcp_sock_server_pt inp_self)
+{
+	int n_events;
+	struct epoll_event *p_events;
+	p_events = calloc(inp_self->maxevents, sizeof(struct epoll_event));
+	tcp_sock_server_event_loop(inp_self, inp_self->epoll_sock_fd, 1, p_events);
+	free(p_events);
+}
 #ifdef __cplusplus
 }
 #endif
