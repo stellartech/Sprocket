@@ -65,6 +65,7 @@ reactor_cb_accept_args_t, *reactor_cb_accept_args_pt;
 
 typedef struct
 {
+	int accepted_fd;
 	reactor_events_e event;
 	void *p_userdata;
 }

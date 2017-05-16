@@ -143,10 +143,10 @@ reactor_epoll_accept(reactor_pt inp_self, int listening_fd)
 				// Note, the callee should alter args.data.accept_args.p_userdata
 				// to point at any new data struct it wants to use for thsi conn.
 				// as it's what gets passed back later on events.
-                		event.data.fd = new_fd;
+                		event.data.ptr = args.data.accept_args.p_userdata;
 	                	event.events = inp_self->event_flags; 
 	        	        rc = epoll_ctl(inp_self->epoll_event_fd, EPOLL_CTL_ADD, 
-					new_fd, args.data.accept_args.p_userdata);
+					new_fd, &event);
 			}
 		}
         }
@@ -188,6 +188,7 @@ reactor_loop_once_for(reactor_pt inp_self, int in_timeout)
 			if(inp_self->p_cb) {
 				reactor_cb_args_t args;
 				args.type = REACTOR_EVENT;
+				args.data.event_args.accepted_fd;
 				args.data.event_args.event = inp_self->p_events[i].events;
 				args.data.event_args.p_userdata = inp_self->p_events[i].data.ptr;
 				(inp_self->p_cb)(&args);

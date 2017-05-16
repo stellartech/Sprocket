@@ -23,3 +23,6 @@ TARGET_LINK_LIBRARIES(conf sprocket)
 ADD_EXECUTABLE(tcps tcps.c)
 TARGET_LINK_LIBRARIES(tcps sprocket)
 
+ADD_EXECUTABLE(reactor reactor.c)
+TARGET_LINK_LIBRARIES(reactor sprocket)
+
