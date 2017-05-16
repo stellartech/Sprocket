@@ -52,41 +52,41 @@ my_callback(const reactor_cb_args_pt inp_args);
 int
 main(int argc, char *argv[])
 {
-	my_globals_t gbls;
+	my_globals_t glbs;
 
-	gbls.p_listener = listener_ctor("0.0.0.0", 8081);
-	if(!gbls.p_listener) {
+	glbs.p_listener = listener_ctor("0.0.0.0", 8081);
+	if(!glbs.p_listener) {
 		printf("Failed ctor()\n");
 		return 0;
 	}
 
-	if(listener_bind(gbls.p_listener) < 1) {
-		printf("Failed bind %d\n", i);
-		listener_dtor(&gbls.p_listener);
+	if(listener_bind(glbs.p_listener) < 1) {
+		printf("Failed bind\n");
+		listener_dtor(&glbs.p_listener);
 		return 0;
 	}
-	listener_set_backlog(gbls.p_listener, 1024);
+	listener_set_backlog(glbs.p_listener, 1024);
 
 	{ // Create a reactor for the listening socket
 		reactor_ctor_args_t args;
-		args.listener_fd = listener_get_fd(gbls.p_listener);
+		args.listener_fd = listener_get_fd(glbs.p_listener);
 		args.event_flags = REACTOR_IN | REACTOR_OUT | REACTOR_ET | REACTOR_RDHUP;
 		args.p_callback = my_callback;
 		args.p_userdata = &glbs;
-		gbls.p_reactor = reactor_ctor(&args);
+		glbs.p_reactor = reactor_ctor(&args);
 	}
 
 	// Activate the listener.
-	listener_listen(gbls.p_listener);
+	listener_listen(glbs.p_listener);
 
 	// Basic event loop
 	while(1) {
-		reactor_loop_once_for(gbls.p_reactor, 100);
+		reactor_loop_once_for(glbs.p_reactor, 100);
 	}
 
 
-	listener_dtor(&p_listener);
-	reactor_dtor(&p_reactor);
+	listener_dtor(&glbs.p_listener);
+	reactor_dtor(&glbs.p_reactor);
 	return 0;
 }
 
