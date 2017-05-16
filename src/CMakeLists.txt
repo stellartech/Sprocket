@@ -25,6 +25,7 @@ SET(sprocket_SRCS
 	ipaddr.c
 	tcp_server/tcp_sock_server.c
 	tcp_server/server_conn.c
+	reactor.c
 )
   
 ADD_LIBRARY(sprocket

@@ -23,7 +23,7 @@
 static int
 epoll_notification_accept(int epoll_fd, int in_fd, struct epoll_event *inp_event);
 static int
-epoll_data_event(struct epoll_event *inp_event);
+epoll_data_event(int epoll_fd, struct epoll_event *inp_event);
 
 
 int
@@ -91,7 +91,7 @@ main(int argc, char *argv[])
 			}
 			else {
 				printf("Data...\n");
-				epoll_data_event(&a_events[i]);
+				epoll_data_event(epoll_fd, &a_events[i]);
 			}
 		}
 
@@ -108,26 +108,28 @@ main(int argc, char *argv[])
 }
 
 static int
-epoll_data_event(struct epoll_event *inp_event)
+epoll_data_event(int epoll_fd, struct epoll_event *inp_event)
 {
 	int rc;
 	ssize_t count;
 	char buf[512];
 
+	// Drain the read buffer for the fd
 	while(1) {
 		memset(buf, 0, 512);
 		count = read(inp_event->data.fd, buf, 512);
 		if(count == -1 && errno == EAGAIN) {
-			printf("    eagain, ok\n");
+			// We get this when the input buffer is empty.
+			printf("    eagain on %d, ok\n", inp_event->data.fd);
 			return 0;
 		}		
 		if(count == -1 && errno != EAGAIN) {
-			printf("    fail not eagain, closing\n");
+			printf("    fail not eagain on %d with %d, closing\n", inp_event->data.fd, errno);
 			close(inp_event->data.fd);
 			return 0;
 		}
 		if(count == 0) {
-			printf("    remote closed connection\n");
+			printf("    remote closed connection on %d\n", inp_event->data.fd);
 			close(inp_event->data.fd);
 			return 0;
 		}
@@ -151,7 +153,6 @@ epoll_notification_accept(int epoll_fd, int in_fd, struct epoll_event *inp_event
 
 	while(1) {
 		if((new_fd = accept(in_fd, &in_addr, &in_len)) == -1) {
-			printf("   accept failed for fd %d\n", in_fd);
 			return 0;
 		}
 		rc = getnameinfo(&in_addr, in_len, hbuf, NI_MAXHOST, sbuf, NI_MAXSERV,
