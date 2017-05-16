@@ -26,6 +26,10 @@
 // to test it out. This will probably form part of an integration
 // test suite at some point (as opposed to unit test suits for
 // code blocks).
+//
+// Note, the event loop only runs for 10 seconds and then the
+// program terminates. This allows it to run under valgrind
+// to check for memory leaks.
 
 #include <stdio.h>
 
@@ -52,6 +56,7 @@ my_callback(const reactor_cb_args_pt inp_args);
 int
 main(int argc, char *argv[])
 {
+	int loop_counter = 0;
 	my_globals_t glbs;
 
 	glbs.p_listener = listener_ctor("0.0.0.0", 8081);
@@ -80,8 +85,9 @@ main(int argc, char *argv[])
 	listener_listen(glbs.p_listener);
 
 	// Basic event loop
-	while(1) {
-		reactor_loop_once_for(glbs.p_reactor, 100);
+	while(loop_counter < 10) {
+		reactor_loop_once_for(glbs.p_reactor, 1000);
+		loop_counter++;
 	}
 
 
