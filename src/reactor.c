@@ -1,5 +1,24 @@
-
-
+/*********************************************************************************
+ *   Copyright (c) 2008-2017 Andy Kirkham  All rights reserved.
+ *
+ *   Permission is hereby granted, free of charge, to any person obtaining a copy
+ *   of this software and associated documentation files (the "Software"),
+ *   to deal in the Software without restriction, including without limitation
+ *   the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ *   and/or sell copies of the Software, and to permit persons to whom
+ *   the Software is furnished to do so, subject to the following conditions:
+ *
+ *   The above copyright notice and this permission notice shall be included
+ *   in all copies or substantial portions of the Software.
+ *
+ *   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ *   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ *   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+ *   THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ *   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *   FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *   IN THE SOFTWARE.
+ ***********************************************************************************/
 
 #include <errno.h>
 #include <fcntl.h>
@@ -92,40 +111,44 @@ reactor_dtor(reactor_pt *inpp)
 }
 
 static int
-reactor_epoll_accept(reactor_pt inp_self, int in_fd)
+reactor_epoll_accept(reactor_pt inp_self, int listening_fd)
 {
-        int rc, new_fd;
+        int new_fd;
+        socklen_t in_len;
         struct sockaddr in_addr;
-        socklen_t in_len = sizeof(struct sockaddr);
-        struct epoll_event event;
-	reactor_cb_args_t args;
 
-        while(1) {
-                if((new_fd = accept(in_fd, &in_addr, &in_len)) == -1) {
-			if((errno == EAGAIN) || (errno == EWOULDBLOCK)) {} // Closed already
-			else {
-				// handle errno.
-			}
-                        return 0; // Accepted all incoming, done.
-                }
-                rc = fcntl(new_fd, F_GETFL, 0);
-                rc |= O_NONBLOCK;
-                fcntl(new_fd, F_SETFL, rc);
-		args.data.accept_args.p_userdata = inp_self->p_userdata;
-		if(inp_self->p_cb) {
-			reactor_cb_args_t args;
-			args.type = REACTOR_ACCEPT;
-			args.data.accept_args.errornumber = errno;
-			args.data.accept_args.listener_fd = in_fd;
-			args.data.accept_args.accecpt_fd = new_fd;
-			args.data.accept_args.in_len = in_len;
-			args.data.accept_args.p_addr = &in_addr;
-			(inp_self->p_cb)(&args);
+        while((new_fd = accept(listening_fd, &in_addr, &in_len)) != -1) {
+		if(inp_self->p_cb == NULL) {
+			close(new_fd);
 		}
-                event.data.fd = new_fd;
-                event.events = inp_self->event_flags; 
-                rc = epoll_ctl(inp_self->epoll_event_fd, EPOLL_CTL_ADD, 
-			new_fd, args.data.accept_args.p_userdata);
+		else {
+                	int rc = fcntl(new_fd, F_GETFL, 0);
+			if(rc < 0) {
+				close(new_fd);
+			}
+			else {
+				reactor_cb_args_t args;
+				struct epoll_event event;
+		                rc |= O_NONBLOCK;
+        		        fcntl(new_fd, F_SETFL, rc);
+				memset(&args, 0, sizeof(reactor_cb_args_t));
+				args.type = REACTOR_ACCEPT;
+				args.data.accept_args.errornumber = errno;
+				args.data.accept_args.listener_fd = listening_fd;
+				args.data.accept_args.accecpt_fd = new_fd;
+				args.data.accept_args.in_len = in_len;
+				args.data.accept_args.p_addr = &in_addr;
+				args.data.accept_args.p_userdata = inp_self->p_userdata;
+				(inp_self->p_cb)(&args); // Callback now.
+				// Note, the callee should alter args.data.accept_args.p_userdata
+				// to point at any new data struct it wants to use for thsi conn.
+				// as it's what gets passed back later on events.
+                		event.data.fd = new_fd;
+	                	event.events = inp_self->event_flags; 
+	        	        rc = epoll_ctl(inp_self->epoll_event_fd, EPOLL_CTL_ADD, 
+					new_fd, args.data.accept_args.p_userdata);
+			}
+		}
         }
         return 0;
 }
@@ -137,8 +160,7 @@ reactor_loop_once_for(reactor_pt inp_self, int in_timeout)
 		int n;
 		struct epoll_event *p_event;
 		// Look for new connections.
-		n = epoll_wait(
-				inp_self->epoll_fd, 
+		n = epoll_wait(inp_self->epoll_fd,
 				inp_self->p_events, 
 				inp_self->num_of_events, in_timeout);
 		for(int i = 0; i < n; i++) {
@@ -159,8 +181,7 @@ reactor_loop_once_for(reactor_pt inp_self, int in_timeout)
 			}
 		}
 		// Look for activity on connections
-		n = epoll_wait(
-				inp_self->epoll_event_fd, 
+		n = epoll_wait(inp_self->epoll_event_fd,
 				inp_self->p_events, 
 				inp_self->num_of_events, in_timeout);
 		for(int i = 0; i < n; i++) {
