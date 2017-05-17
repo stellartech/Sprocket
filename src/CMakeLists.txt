@@ -26,6 +26,8 @@ SET(sprocket_SRCS
 	tcp_server/tcp_sock_server.c
 	tcp_server/server_conn.c
 	reactor.c
+	reactor_buf.c
+	reactor_nn.c
 )
   
 ADD_LIBRARY(sprocket
