@@ -157,8 +157,8 @@ int
 reactor_loop_once_for(reactor_pt inp_self, int in_timeout)
 {
 	if(inp_self) {
-		int n;
-		struct epoll_event *p_event;
+		int n = 0;
+		struct epoll_event *p_event = NULL;
 		// Look for new connections.
 		n = epoll_wait(inp_self->epoll_fd,
 				inp_self->p_events, 

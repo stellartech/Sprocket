@@ -33,10 +33,38 @@
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 
+#include <netdb.h>
+
 #include "../src/reactor.h"
 #include "../src/listener.h"
 
 #define MAXEVENTS 64
+
+typedef struct
+{
+	int ev;
+	const char *p_name;
+} n_events_t;
+
+static n_events_t n_events[] = 
+{
+	  { 0x0001, "EPOLLIN" }
+	, { 0x0002, "EPOLLPRI" }
+	, { 0x0004, "EPOLLOUT" }
+	, { 0x0008, "EPOLLERR" }
+	, { 0x0010, "EPOLLHUP" }
+	, { 0x0040, "EPOLLRDNORM" }
+	, { 0x0080, "EPOLLRDBAND" }
+	, { 0x0100, "EPOLLWRNORM" }
+	, { 0x0200, "EPOLLWRBAND" }
+	, { 0x0400, "EPOLLMSG" }
+	, { 0x2000, "EPOLLRDHUP" }
+	, { (1<<29), "EPOLLWAKEUP" }
+	, { (1<<30), "EPOLLONESHOT" }
+	, { (1<<31), "EPOLLET" }
+	, { 0, "" }
+};
+
 
 typedef struct
 {
@@ -59,29 +87,30 @@ main(int argc, char *argv[])
 	SSL_library_init();
 	OpenSSL_add_all_algorithms();
 
-	globals.p_sslctx = SSL_CTX_new(TLSv1_1_method());
+	globals.p_sslctx = SSL_CTX_new(TLSv1_2_method());
 	SSL_CTX_set_options(globals.p_sslctx, SSL_OP_SINGLE_DH_USE);	
-	rc = SSL_CTX_use_certificate_file(globals.p_sslctx, 
-		"/certs/localhost_ajk_io/localhost.ajk.io.ha.pem" , SSL_FILETYPE_PEM);
+
+	rc = SSL_CTX_use_certificate_chain_file(globals.p_sslctx, 
+		"/certs/localhost_ajk_io/localhost.ajk.io.ha.pem");
 	if(rc != 1) {
-		printf("Error on SSL_CTX_use_certificate_file()\n");
+		fprintf(stderr, "Error on SSL_CTX_use_certificate_file()\n");
 		return 0;
 	}
 	rc = SSL_CTX_use_PrivateKey_file(globals.p_sslctx,
 		"/certs/localhost_ajk_io/localhost.ajk.io.key", SSL_FILETYPE_PEM);
 	if(rc != 1) {
-		printf("Error on SSL_CTX_use_PrivateKey_file()\n");
+		fprintf(stderr, "Error on SSL_CTX_use_PrivateKey_file()\n");
 		return 0;
 	}
 
 	globals.p_listener = listener_ctor("0.0.0.0", 443);
 	if(!globals.p_listener) {
-		printf("Failed ctor()\n");
+		fprintf(stderr, "Failed ctor()\n");
 		return 0;
 	}
 
 	if(listener_bind(globals.p_listener) < 1) {
-		printf("Failed bind\n");
+		fprintf(stderr, "Failed bind\n");
 		listener_dtor(&globals.p_listener);
 		return 0;
 	}
@@ -100,8 +129,8 @@ main(int argc, char *argv[])
 	listener_listen(globals.p_listener);
 
 	// Basic event loop
-	printf("Entering event loop\n");
-	while(loop_counter < 30) {
+	fprintf(stderr, "Entering event loop\n");
+	while(loop_counter < 300) {
 		reactor_loop_once_for(globals.p_reactor, 1000);
 		loop_counter++;
 	}
@@ -119,6 +148,8 @@ typedef struct
 	SSL *p_ssl;
 	struct sockaddr addr;
 	socklen_t addr_len;
+	char remote_ip[NI_NUMERICHOST];
+	char remote_port[NI_NUMERICSERV];
 }
 my_data_t, *my_data_pt;
 
@@ -130,11 +161,11 @@ my_callback_accept(const reactor_cb_args_pt inp_args)
 	my_data_pt p_data = calloc(1, sizeof(my_data_t));
 	if(p_data) {
 		int rc;
-		printf("my_callback_accept()...");
+		fprintf(stderr, "my_callback_accept()...");
 		my_globals_t *p_globals = (my_globals_t*)inp_args->data.accept_args.p_userdata;
 		SSL_CTX *p_sslctx = p_globals->p_sslctx;
 		if(!p_sslctx) {
-			printf(" fail1\n");
+			fprintf(stderr, " fail1\n");
 			close(inp_args->data.accept_args.accecpt_fd);
 			return -1;
 		}
@@ -142,7 +173,7 @@ my_callback_accept(const reactor_cb_args_pt inp_args)
 		p_data->addr_len = inp_args->data.accept_args.in_len;
 		memcpy(&p_data->addr, inp_args->data.accept_args.p_addr, p_data->addr_len);
 		if((p_data->p_ssl = SSL_new(p_sslctx)) == NULL) {
-			printf(" fail3\n");
+			fprintf(stderr, " fail3\n");
 			close(inp_args->data.accept_args.accecpt_fd);
 			return -1;
 		}
@@ -151,7 +182,7 @@ my_callback_accept(const reactor_cb_args_pt inp_args)
 			rc = SSL_get_error(p_data->p_ssl, rc);
 			if(rc == SSL_ERROR_WANT_READ) SSL_read(p_data->p_ssl, NULL, 0);
 			else {
-				printf(" fail2 %d\n", rc);
+				fprintf(stderr, " fail2 %d\n", rc);
 				close(inp_args->data.accept_args.accecpt_fd);
 				return -1;
 			}
@@ -162,53 +193,158 @@ my_callback_accept(const reactor_cb_args_pt inp_args)
 		// per incoming fd p_userdata value which you need when processing events
 		// later on in the my_callback_event() function.
 		inp_args->data.accept_args.p_userdata = p_data;
-		printf(" ok\n");
+
+		{ // Log incoming
+			char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
+			rc = getnameinfo(&p_data->addr, p_data->addr_len,
+				hbuf, sizeof(hbuf), sbuf, sizeof(sbuf),
+				NI_NUMERICHOST | NI_NUMERICSERV);
+			if(rc == 0) {
+				fprintf(stderr, "Accepted conn on %d '%s:%s'\n",
+					p_data->fd, hbuf, sbuf);
+			}
+			else {
+				fprintf(stderr, "Failed with %d\n", rc);
+			}
+
+		}
 		return 0;
 	}
 	close(inp_args->data.accept_args.accecpt_fd);
 	return -1;
 }
 
+int once = -1;
+const char response[] = 
+	"HTTP/1.1 200 OK\r\n"
+	"Content-Length: 5\r\n\r\n"
+	"hello";
+
+static int
+my_callback_write(my_data_pt inp_data)
+{
+	// ToDo
+	int rc = SSL_get_state(inp_data->p_ssl);
+	fprintf(stderr, "my_callback_write() state %d\n", rc);
+	rc = SSL_write(inp_data->p_ssl, NULL, 0);
+	if(rc < 0) {
+		rc = SSL_get_error(inp_data->p_ssl, rc);
+		switch(rc) {
+			case SSL_ERROR_WANT_READ:
+				fprintf(stderr, "\tSSL_ERROR_WANT_READ\n");
+				SSL_read(inp_data->p_ssl, NULL, 0);
+				break;
+			case SSL_ERROR_WANT_WRITE:
+				fprintf(stderr, "\tSSL_ERROR_WANT_WRITE\n");
+				SSL_write(inp_data->p_ssl, NULL, 0);
+				break;		
+			default:
+				SSL_shutdown(inp_data->p_ssl);
+				SSL_free(inp_data->p_ssl);
+				close(inp_data->fd);
+				free(inp_data);
+				break;	
+		}
+	}	
+	if(once == 0) {
+		fprintf(stderr, "\tSending dummy response\n");
+		SSL_write(inp_data->p_ssl, response, sizeof(response)-1);
+		once++;
+	}
+	// ToDo, we need a go over the output buffer list and
+	// write out any pending data.
+	return 0;
+}
+
+static int
+my_callback_read(my_data_pt inp_data)
+{
+	int rc, len = 0;
+	char buf[512];
+	memset(buf, 0, sizeof(buf));
+	fprintf(stderr, "my_callback_read() %d\n", SSL_pending(inp_data->p_ssl));
+	while(1) { //(len = SSL_read(inp_data->p_ssl, buf, sizeof(buf))) > 0) {
+		len = SSL_read(inp_data->p_ssl, buf, sizeof(buf));
+		fprintf(stderr, "\tmy_callback_read() %d %d\n", len, SSL_pending(inp_data->p_ssl));
+		if(len < 1) break;
+		fprintf(stderr, "%s", buf);
+		memset(buf, 0, sizeof(buf));
+	}
+	once = 0;
+	if(len < 0) {
+		int rc = SSL_get_error(inp_data->p_ssl, len);
+		switch(rc) {
+			case SSL_ERROR_WANT_READ:
+				fprintf(stderr, "\tSSL_ERROR_WANT_READ\n");
+				SSL_read(inp_data->p_ssl, NULL, 0);
+				break;
+			case SSL_ERROR_WANT_WRITE:
+				fprintf(stderr, "\tSSL_ERROR_WANT_WRITE\n");
+				SSL_write(inp_data->p_ssl, NULL, 0);
+				break;		
+			default:
+				SSL_shutdown(inp_data->p_ssl);
+				SSL_free(inp_data->p_ssl);
+				close(inp_data->fd);
+				free(inp_data);
+				break;	
+		}
+	}
+	return 0;
+}
+
 static int 
 my_callback_event(const reactor_cb_args_pt inp_args)
 {
-	int len = 0;
-	char buf[512];
+	int fd = inp_args->data.event_args.accepted_fd;
+	int ev = inp_args->data.event_args.event;
 	my_data_pt p_data = (my_data_pt)inp_args->data.event_args.p_userdata;
-	memset(buf, 0, sizeof(buf));
-	printf(" event %d %08x\n", inp_args->data.event_args.accepted_fd, inp_args->data.event_args.event);
+
+	fprintf(stderr, "my_callback_event() fd %d ev %08x\n", fd, ev);
 	assert(inp_args->data.event_args.p_userdata != NULL);
-	if(1 || inp_args->data.event_args.event & REACTOR_IN) {
-		while((len = SSL_read(p_data->p_ssl, buf, sizeof(buf))) > 0) {
-			printf("%s", buf);
-			SSL_write(p_data->p_ssl, buf, len);
-			memset(buf, 0, sizeof(buf));
-		}
-	 	if(len < 0) {
-			int rc = SSL_get_error(p_data->p_ssl, len);
-			if(rc != SSL_ERROR_WANT_READ && rc != SSL_ERROR_WANT_WRITE) {
-				SSL_shutdown(p_data->p_ssl);
-				SSL_free(p_data->p_ssl);
-				close(p_data->fd);
-				free(p_data);
-			}
-		}	
-		if(len == 0) {
-			SSL_shutdown(p_data->p_ssl);
-			SSL_free(p_data->p_ssl);
-			close(p_data->fd);
-			free(p_data);
-		}
+	if(ev & REACTOR_RDHUP) {
+		fprintf(stderr, "\tConnection reset by peer\n");
+		SSL_shutdown(p_data->p_ssl);
+		SSL_free(p_data->p_ssl);
+		close(p_data->fd);
+		free(p_data);
 		return 0;
 	}
-	return -1;
+	if(ev & REACTOR_IN) {
+		my_callback_read(p_data);
+	}
+	if(ev & REACTOR_OUT) {
+		my_callback_write(p_data);		
+	}
+	return 0;
 }
 
+static const char*
+get_event_name(int in_ev, int from, int *at)
+{
+	for(int i = from; n_events[i].ev > 0; i++) {
+		if(in_ev & n_events[i].ev) {
+			if(at) *at = i;
+			return n_events[i].p_name;
+		}
+	}
+	return NULL;
+}
 
 static int
 my_callback(const reactor_cb_args_pt inp_args)
 {
-	printf("Callback\n");
+	int i = 0;
+	int ev = inp_args->data.event_args.event;
+	const char *p_name = NULL;
+	fprintf(stderr, "my_callback() %08x\n", ev);
+	
+	p_name = get_event_name(ev, i, &i);
+	while(p_name) {
+		fprintf(stderr, "\tev: %s\n", p_name);
+		p_name = get_event_name(ev, i+1, &i);
+	}
+		
 	switch (inp_args->type) {
 	case REACTOR_ACCEPT: 
 		my_callback_accept(inp_args);
