@@ -19,6 +19,7 @@ SET(sprocket_SRCS
 	base64.c
 	llist.c
 	buffer.c
+	bufvec.c
 	queue.c
 	thpool.c
 	ws_wire.c
@@ -26,6 +27,7 @@ SET(sprocket_SRCS
 	tcp_server/tcp_sock_server.c
 	tcp_server/server_conn.c
 	reactor.c
+	ssl.c
 )
   
 ADD_LIBRARY(sprocket

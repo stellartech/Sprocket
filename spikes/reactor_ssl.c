@@ -144,13 +144,14 @@ main(int argc, char *argv[])
 	listener_dtor(&globals.p_listener);
 
 	// Wow, OpenSSL requires some cleanup on exit!
+	// All these were needed to make Valgrind happy.
+	SSL_CTX_free(globals.p_sslctx);
 	ERR_remove_thread_state(NULL);
 	ENGINE_cleanup();
 	CONF_modules_free();
 	EVP_cleanup();
 	CRYPTO_cleanup_all_ex_data();
 	SSL_COMP_free_compression_methods();
-	SSL_CTX_free(globals.p_sslctx);
 	ERR_free_strings();
 
 	reactor_dtor(&globals.p_reactor);
@@ -160,6 +161,7 @@ main(int argc, char *argv[])
 typedef struct
 {
 	int fd;
+	int state;
 	SSL *p_ssl;
 	struct sockaddr addr;
 	socklen_t addr_len;
@@ -232,8 +234,8 @@ my_callback_accept(const reactor_cb_args_pt inp_args)
 int once = -1;
 const char response[] = 
 	"HTTP/1.1 200 OK\r\n"
-	"Content-Length: 5\r\n\r\n"
-	"hello";
+	"Content-Length: 7\r\n\r\n"
+	"hello\r\n";
 
 static int
 my_callback_write(my_data_pt inp_data)
@@ -275,18 +277,34 @@ my_callback_write(my_data_pt inp_data)
 static int
 my_callback_read(my_data_pt inp_data)
 {
-	int rc, len = 0;
-	char buf[512];
-	memset(buf, 0, sizeof(buf));
-	fprintf(stderr, "my_callback_read() %d\n", SSL_pending(inp_data->p_ssl));
-	while(1) { //(len = SSL_read(inp_data->p_ssl, buf, sizeof(buf))) > 0) {
-		len = SSL_read(inp_data->p_ssl, buf, sizeof(buf));
-		fprintf(stderr, "\tmy_callback_read() %d %d\n", len, SSL_pending(inp_data->p_ssl));
-		if(len < 1) break;
-		fprintf(stderr, "%s", buf);
-		memset(buf, 0, sizeof(buf));
+	int rc, len = 0, buf_len = 0;
+	char *s, *pbuf;
+
+	if((buf_len = SSL_pending(inp_data->p_ssl)) == 0) {
+		buf_len = 4096;
 	}
-	once = 0;
+
+	pbuf = malloc(buf_len);
+
+	fprintf(stderr, "my_callback_read() pending: %d\n", SSL_pending(inp_data->p_ssl));
+	while(1) { //(len = SSL_read(inp_data->p_ssl, buf, sizeof(buf))) > 0) {
+		memset(pbuf, 0, buf_len);
+		len = SSL_read(inp_data->p_ssl, pbuf, buf_len);
+		s = strndup(pbuf, len);
+		fprintf(stderr, "\tmy_callback_read() len = %d pending = %d\n\t%s\n", len, SSL_pending(inp_data->p_ssl), s);
+		free(s);
+		if(len > 0) {
+			once = 0;
+			if((buf_len = SSL_pending(inp_data->p_ssl)) == 0) {
+				buf_len = 4096;
+			}
+			inp_data->state = 1;
+			free(pbuf);
+			pbuf = malloc(buf_len);
+		}
+		if(len < 1) break;
+	}
+	if(pbuf) free(pbuf);
 	if(len < 0) {
 		int rc = SSL_get_error(inp_data->p_ssl, len);
 		switch(rc) {
@@ -307,12 +325,13 @@ my_callback_read(my_data_pt inp_data)
 				break;	
 		}
 	}
-	return 0;
+	return len;
 }
 
 static int 
 my_callback_event(const reactor_cb_args_pt inp_args)
 {
+	int sh = 1;
 	int fd = inp_args->data.event_args.accepted_fd;
 	int ev = inp_args->data.event_args.event;
 	my_data_pt p_data = (my_data_pt)inp_args->data.event_args.p_userdata;
@@ -329,7 +348,19 @@ my_callback_event(const reactor_cb_args_pt inp_args)
 		return 0;
 	}
 	if(ev & REACTOR_IN) {
-		my_callback_read(p_data);
+		sh = my_callback_read(p_data);
+	}
+	if(0 && ev & REACTOR_OUT) {
+		my_callback_write(p_data);		
+	}
+	if(sh == 0) {
+		fprintf(stderr, "\tConnection reset by peer\n");
+		SSL_shutdown(p_data->p_ssl);
+		SSL_free(p_data->p_ssl);
+		ERR_remove_thread_state(NULL);
+		close(p_data->fd);
+		free(p_data);
+		return 0;
 	}
 	if(ev & REACTOR_OUT) {
 		my_callback_write(p_data);		
