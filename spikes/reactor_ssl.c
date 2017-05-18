@@ -23,6 +23,9 @@
 // As spike project reactor.c but with SSL
 
 // Ref https://www.ibm.com/support/knowledgecenter/en/SSB23S_1.1.0.12/gtps7/s5sple1.html
+//
+// SSL Gold
+// http://stackoverflow.com/questions/29845527/how-to-properly-uninitialize-openssl
 
 #include <stdio.h>
 
@@ -32,6 +35,8 @@
 #include <arpa/inet.h>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
+#include <openssl/conf.h>
+#include <openssl/engine.h>
 
 #include <netdb.h>
 
@@ -130,14 +135,24 @@ main(int argc, char *argv[])
 
 	// Basic event loop
 	fprintf(stderr, "Entering event loop\n");
-	while(loop_counter < 300) {
+	while(loop_counter < 10) {
 		reactor_loop_once_for(globals.p_reactor, 1000);
 		loop_counter++;
 	}
 
 
 	listener_dtor(&globals.p_listener);
+
+	// Wow, OpenSSL requires some cleanup on exit!
+	ERR_remove_thread_state(NULL);
+	ENGINE_cleanup();
+	CONF_modules_free();
+	EVP_cleanup();
+	CRYPTO_cleanup_all_ex_data();
+	SSL_COMP_free_compression_methods();
 	SSL_CTX_free(globals.p_sslctx);
+	ERR_free_strings();
+
 	reactor_dtor(&globals.p_reactor);
 	return 0;
 }
@@ -241,6 +256,7 @@ my_callback_write(my_data_pt inp_data)
 			default:
 				SSL_shutdown(inp_data->p_ssl);
 				SSL_free(inp_data->p_ssl);
+				ERR_remove_thread_state(NULL);
 				close(inp_data->fd);
 				free(inp_data);
 				break;	
@@ -285,6 +301,7 @@ my_callback_read(my_data_pt inp_data)
 			default:
 				SSL_shutdown(inp_data->p_ssl);
 				SSL_free(inp_data->p_ssl);
+				ERR_remove_thread_state(NULL);
 				close(inp_data->fd);
 				free(inp_data);
 				break;	
@@ -306,6 +323,7 @@ my_callback_event(const reactor_cb_args_pt inp_args)
 		fprintf(stderr, "\tConnection reset by peer\n");
 		SSL_shutdown(p_data->p_ssl);
 		SSL_free(p_data->p_ssl);
+		ERR_remove_thread_state(NULL);
 		close(p_data->fd);
 		free(p_data);
 		return 0;
