@@ -11,6 +11,7 @@
 #include <openssl/engine.h>
 
 #include "ssl.h"
+#include "iovarr.h"
 
 #ifdef __cplusplus
 extern C {
@@ -74,6 +75,8 @@ typedef struct
         SSL *p_ssl;
         struct sockaddr addr;
         socklen_t addr_len;
+	iovarr_pt p_out_iovarr;
+	void *p_userdata;
         //char remote_ip[NI_NUMERICHOST];
         //char remote_port[NI_NUMERICSERV];
 }
@@ -101,6 +104,7 @@ ssl_reactor_cb_accept(const reactor_cb_args_pt inp_args)
 		return -1;
 	}
 	p_self = (ssl_pt)inp_args->data.accept_args.p_userdata;
+	p_data->p_userdata = p_self;
 	p_data->fd = inp_args->data.accept_args.accecpt_fd;
 	p_data->addr_len = inp_args->data.accept_args.in_len;
 	memcpy(&p_data->addr, inp_args->data.accept_args.p_addr, p_data->addr_len);
@@ -112,8 +116,7 @@ ssl_reactor_cb_accept(const reactor_cb_args_pt inp_args)
 	SSL_set_fd(p_data->p_ssl, p_data->fd);
 	if((rc = SSL_accept(p_data->p_ssl)) < 1) {
 		rc = SSL_get_error(p_data->p_ssl, rc);
-		if(rc == SSL_ERROR_WANT_READ) SSL_read(p_data->p_ssl, NULL, 0);
-		else {
+		if(rc != SSL_ERROR_WANT_READ && rc != SSL_ERROR_WANT_WRITE) {
 			close(inp_args->data.accept_args.accecpt_fd);
 			free(p_data);
 			return -1;
@@ -127,35 +130,108 @@ static int
 ssl_reactor_read(my_data_pt inp_data)
 {
 	void *pbuf;
-	int pending_len, len;
-	struct iovec *p_iovec;
+	int len, pending_len;
+	iovarr_pt p_iovarr;
+	struct iovec iovec;
 
-	p_iovec = calloc(1, sizeof(struct iovec));
-	if(!p_iovec) {
+	if((p_iovarr = iovarr_ctor()) == NULL) {
 		ssl_reactor_close_sock(inp_data);
 		return -1;
 	}
 	if((pending_len = SSL_pending(inp_data->p_ssl)) == 0) {
 		pending_len = 4096;
 	}
-	if((pbuf = calloc(1, pending_len)) == NULL) {
-		free(p_iovec);
-		ssl_reactor_close_sock(inp_data);
-		return -1;
-	}
-	for(;;) {
+	while(pending_len > 0) {
+		if((pbuf = calloc(1, pending_len)) == NULL) {
+			ssl_reactor_close_sock(inp_data);
+			iovarr_decref(p_iovarr);
+			return -1;
+		}
 		len = SSL_read(inp_data->p_ssl, pbuf, pending_len);
 		if(len > 0) {
-			p_iovec->iov_base = pbuf;
-			p_iovec->iov_len = len;
+			iovec.iov_base = pbuf; 
+			iovec.iov_len = len;
+			iovarr_pushback(p_iovarr, &iovec);
 			pending_len = SSL_pending(inp_data->p_ssl);
-			if(pending_len) {
-				// New iovec struct and buffer
-			}	
+		}	
+		else if(len < 0) {
+			int rc = SSL_get_error(inp_data->p_ssl, len);
+			switch(rc) {
+			case SSL_ERROR_WANT_READ:
+			case SSL_ERROR_WANT_WRITE:
+			case SSL_ERROR_NONE:
+				// Reactor will call again in the future
+				// to meet the needs of SSL_read or SSL_write.
+				free(pbuf);
+				// Fallthru.
+			default:
+				pending_len = SSL_pending(inp_data->p_ssl);
+			}
+		}
+		else {
+			free(pbuf);
+			ssl_reactor_close_sock(inp_data);
+			iovarr_decref(p_iovarr);
+			return 0;
 		}
 	}	
 
+	if(iovarr_count(p_iovarr) > 0) {
+		// Make callback to upper layer
+		// passing this conn data and the
+		// iovarr of payload data.
+		// The callback can steal the
+		// iovarr if it wants to.
+
+		// If it didn't steal it, then
+		// free it.
+		iovarr_decref(p_iovarr);
+	}
+
 	return 1;
+}
+
+static int
+ssl_reactor_write(my_data_pt inp_data)
+{
+	if(!inp_data) return -1;
+	if(!inp_data->p_out_iovarr) return 0;
+	if(iovarr_count(inp_data->p_out_iovarr) < 1) return 0;
+	else {
+		struct iovec *p_iovec = iovarr_ref(inp_data->p_out_iovarr);
+		while(p_iovec && iovarr_count(inp_data->p_out_iovarr) > 0) {
+			int len = SSL_write(inp_data->p_ssl, p_iovec[0].iov_base, p_iovec[0].iov_len);
+			if(len == p_iovec[0].iov_len) {
+				// Take ownership of the sent iov_base buffer and free it.
+				void *pbuf = iovarr_popfront(inp_data->p_out_iovarr, NULL);
+				if(pbuf) free(pbuf);
+			}
+			else if(len < 1) {
+				switch(SSL_get_error(inp_data->p_ssl, len)) {
+				case SSL_ERROR_WANT_READ:
+				case SSL_ERROR_WANT_WRITE:
+				case SSL_ERROR_NONE:
+					// Reactor will call again in the future
+					// to meet the needs of SSL_write.
+					return 0;
+				default:
+					ssl_reactor_close_sock(inp_data);
+					return -1;
+				}
+			}
+			else { 
+				// Partial buffer send, requeue remaining bytes.
+				// in the iov buffer.
+				int remaining = p_iovec[0].iov_len - len;
+				void *dst = p_iovec[0].iov_base;
+				void *src = dst + len;
+				memcpy(dst, src, remaining);
+				p_iovec[0].iov_len = remaining;
+			}
+		}
+		return 0;
+	}
+	return -1;
 }
 
 static int

@@ -19,7 +19,7 @@ SET(sprocket_SRCS
 	base64.c
 	llist.c
 	buffer.c
-	bufvec.c
+	iovarr.c
 	queue.c
 	thpool.c
 	ws_wire.c

@@ -309,14 +309,15 @@ my_callback_read(my_data_pt inp_data)
 		int rc = SSL_get_error(inp_data->p_ssl, len);
 		switch(rc) {
 			case SSL_ERROR_WANT_READ:
-				fprintf(stderr, "\tSSL_ERROR_WANT_READ\n");
-				SSL_read(inp_data->p_ssl, NULL, 0);
+				//len = SSL_read(inp_data->p_ssl, NULL, 0);
+				fprintf(stderr, "\tSSL_ERROR_WANT_READ %d\n", len);
 				break;
 			case SSL_ERROR_WANT_WRITE:
-				fprintf(stderr, "\tSSL_ERROR_WANT_WRITE\n");
-				SSL_write(inp_data->p_ssl, NULL, 0);
+				//len = SSL_write(inp_data->p_ssl, NULL, 0);
+				fprintf(stderr, "\tSSL_ERROR_WANT_WRITE %d\n", len);
 				break;		
 			default:
+				fprintf(stderr, "\tSSL_ERROR_UNKNOWN %d\n", rc);
 				SSL_shutdown(inp_data->p_ssl);
 				SSL_free(inp_data->p_ssl);
 				ERR_remove_thread_state(NULL);
