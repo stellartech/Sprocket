@@ -22,21 +22,23 @@ iovarr_ctor(void)
 	return p_self;
 }
 
-void
+static void
 iovarr_free(void *inp)
 {
 	if(inp) {
 		iovarr_pt p_self = (iovarr_pt)inp;
 		p_self->refcount = __sync_fetch_and_sub(&p_self->refcount, 1);
 		if(p_self->refcount == 0) {
-			for(int i = 0; i < p_self->iovlen; i++) {
-				if(p_self->iovarr[i].iov_base) {
-					free(p_self->iovarr[i].iov_base);
+			if(p_self->iovarr) {
+				for(int i = 0; i < p_self->iovlen; i++) {
+					if(p_self->iovarr[i].iov_base) {
+						free(p_self->iovarr[i].iov_base);
+					}
 				}
+				free(p_self->iovarr);
 			}
 			free(p_self);
 		}
-		
 	}
 }
 
@@ -65,13 +67,19 @@ iovarr_popfront(iovarr_pt inp_self, int *outp_iov_len)
 }
 
 iovarr_pt
-iovarr_incref(iovarr_pt inp_self)
+iovarr_copy_byref(iovarr_pt inp_self)
 {
 	if(inp_self) {
 		inp_self->refcount = __sync_fetch_and_add(&inp_self->refcount, 1);
 		return inp_self;
 	}
 	return NULL;
+}
+
+iovarr_pt
+iovarr_incref(iovarr_pt inp_self)
+{
+	return iovarr_copy_byref(inp_self);
 }
 
 void
@@ -85,8 +93,8 @@ iovarr_decref(iovarr_pt inp_self)
 int
 iovarr_pushback(iovarr_pt inp_self, struct iovec *inp_iovec)
 {
-	int newlen = 0;
 	if(inp_self && inp_iovec) {
+		int newlen = 0;
 		if(inp_self->iovlen == 0) {
 			if((inp_self->iovarr = calloc(1, sizeof(struct iovec))) == NULL) return -1;
 			newlen = 1;
@@ -101,6 +109,28 @@ iovarr_pushback(iovarr_pt inp_self, struct iovec *inp_iovec)
 		return 0;
 	}
 	return -1;
+}
+
+int
+iovarr_steal(iovarr_pt inp_self, iovarr_pt inp_other)
+{
+	int newlen = 0;
+	if(!inp_self || !inp_other) return -1;
+	newlen = inp_self->iovlen + inp_other->iovlen;
+	if(newlen > inp_self->iovlen) {
+		inp_self->iovarr = inp_self->iovlen == 0 ?
+			calloc(newlen, sizeof(struct iovec)) :
+			realloc(inp_self->iovarr, newlen * sizeof(struct iovec));
+		if(!inp_self->iovarr) return -1;	
+		for (int i = 0; inp_other->iovlen > 0; i++, inp_other->iovlen--) {
+			memcpy(&inp_self->iovarr[i+inp_self->iovlen], 
+				&inp_other->iovarr[i], sizeof(struct iovec));
+		}
+		free(inp_other->iovarr);
+		inp_other->iovarr = NULL;
+		inp_self->iovlen = newlen;
+	}
+	return newlen;
 }
 
 int

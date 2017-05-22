@@ -13,9 +13,6 @@ typedef struct _iovarr * iovarr_pt;
 iovarr_pt
 iovarr_ctor(void);
 
-void
-iovarr_free(void*);
-
 iovarr_pt
 iovarr_incref(iovarr_pt inp_self);
 
@@ -33,6 +30,9 @@ iovarr_popfront(iovarr_pt inp_self, int *outp_len);
 
 int
 iovarr_pushback(iovarr_pt inp_self, struct iovec *inp_iovec);
+
+int
+iovarr_steal(iovarr_pt inp_self, iovarr_pt inp_other);
 
 #endif /* IOVARR_H_INCLUDED */
 

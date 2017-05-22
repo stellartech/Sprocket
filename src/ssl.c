@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdint.h>
 #include <sys/uio.h>
 #include <arpa/inet.h>
 #include <openssl/ssl.h>
@@ -10,8 +11,10 @@
 #include <openssl/conf.h>
 #include <openssl/engine.h>
 
+
 #include "ssl.h"
 #include "iovarr.h"
+#include "conn_if.h"
 
 #ifdef __cplusplus
 extern C {
@@ -70,17 +73,18 @@ ssl_free(void *inp)
 ///
 typedef struct
 {
+	conn_t	conn; // Must be defined first in struct.
         int fd;
         int state;
         SSL *p_ssl;
-        struct sockaddr addr;
-        socklen_t addr_len;
 	iovarr_pt p_out_iovarr;
+	uint64_t bytes_in;
+	uint64_t bytes_out;
 	void *p_userdata;
-        //char remote_ip[NI_NUMERICHOST];
-        //char remote_port[NI_NUMERICSERV];
 }
 my_data_t, *my_data_pt;
+
+///
 
 static void 
 ssl_reactor_close_sock(my_data_pt inp_data)
@@ -91,6 +95,81 @@ ssl_reactor_close_sock(my_data_pt inp_data)
 	ERR_remove_thread_state(NULL);
 	close(inp_data->fd);
 	free(inp_data);
+}
+
+// conn_if
+static void
+ssl_reactor_conn_if_close(conn_pt inp_conn)
+{
+	my_data_pt p_self = (my_data_pt)inp_conn;
+	ssl_reactor_close_sock(p_self);
+}
+
+static iovarr_pt
+ssl_reactor_conn_if_read(conn_pt inp_conn)
+{
+	my_data_pt p_self = (my_data_pt)inp_conn;
+	return NULL;
+}
+
+static int
+ssl_reactor_conn_if_write(conn_pt inp_conn, void *inp_buf, int in_buflen)
+{
+	my_data_pt p_self = (my_data_pt)inp_conn;
+	if(!p_self->p_out_iovarr) return -1;
+	if(iovarr_count(p_self->p_out_iovarr) != 0) {
+		// If there is a waiting queue to write
+		// then append this buffer to that queue
+		// and tell the caller they were sent.
+		struct iovec vec;
+		vec.iov_base = inp_buf;
+		vec.iov_len = in_buflen;
+		iovarr_pushback(p_self->p_out_iovarr, &vec);
+		return in_buflen;
+	}
+	else {
+		// If the output buffer is empty try sending immediately
+		// and handle SSL as required. 
+		int len = SSL_write(p_self->p_ssl, inp_buf, in_buflen);
+		if(len == in_buflen) {
+			free(inp_buf);
+			return in_buflen;
+		}
+		else if(len < 1) {
+			switch(SSL_get_error(p_self->p_ssl, len)) {
+			case SSL_ERROR_WANT_READ:
+			case SSL_ERROR_WANT_WRITE:
+			case SSL_ERROR_NONE:
+			{
+				struct iovec vec;
+				vec.iov_base = inp_buf;
+				vec.iov_len = in_buflen;
+				iovarr_pushback(p_self->p_out_iovarr, &vec);
+				return in_buflen;
+			}
+			default:
+				// Callback to upper layer, closing!
+				ssl_reactor_close_sock(p_self);
+				free(inp_buf);
+				return -1;
+			}
+		}
+		else {
+			// If we sent some but not all bytes in the 
+			// buffer then requeue these remain bytes
+			// and tell teh caller they all went.
+			struct iovec vec;
+			int remaining = in_buflen - len;
+			void *dst = inp_buf;
+			void *src = inp_buf + len;
+			memcpy(dst, src, remaining);
+			vec.iov_base = inp_buf;
+			vec.iov_len = remaining;
+			iovarr_pushback(p_self->p_out_iovarr, &vec);
+			return in_buflen;
+		}
+	}
+	return -1; // Should never reach here.
 }
 
 static int
@@ -106,8 +185,11 @@ ssl_reactor_cb_accept(const reactor_cb_args_pt inp_args)
 	p_self = (ssl_pt)inp_args->data.accept_args.p_userdata;
 	p_data->p_userdata = p_self;
 	p_data->fd = inp_args->data.accept_args.accecpt_fd;
-	p_data->addr_len = inp_args->data.accept_args.in_len;
-	memcpy(&p_data->addr, inp_args->data.accept_args.p_addr, p_data->addr_len);
+	p_data->conn.iface.close = ssl_reactor_conn_if_close;
+	p_data->conn.iface.read = ssl_reactor_conn_if_read;
+	p_data->conn.iface.write = ssl_reactor_conn_if_write;
+	p_data->conn.addrlen = inp_args->data.accept_args.in_len;
+	memcpy(&p_data->conn.addr, inp_args->data.accept_args.p_addr, p_data->conn.addrlen);
 	if((p_data->p_ssl = SSL_new(p_self->p_sslctx)) == NULL) {
 		close(inp_args->data.accept_args.accecpt_fd);
 		free(p_data);
@@ -152,6 +234,7 @@ ssl_reactor_read(my_data_pt inp_data)
 			iovec.iov_base = pbuf; 
 			iovec.iov_len = len;
 			iovarr_pushback(p_iovarr, &iovec);
+			inp_data->bytes_in += len;
 			pending_len = SSL_pending(inp_data->p_ssl);
 		}	
 		else if(len < 0) {
@@ -207,17 +290,6 @@ ssl_reactor_write(my_data_pt inp_data)
 				if(pbuf) free(pbuf);
 			}
 			else if(len < 1) {
-				switch(SSL_get_error(inp_data->p_ssl, len)) {
-				case SSL_ERROR_WANT_READ:
-				case SSL_ERROR_WANT_WRITE:
-				case SSL_ERROR_NONE:
-					// Reactor will call again in the future
-					// to meet the needs of SSL_write.
-					return 0;
-				default:
-					ssl_reactor_close_sock(inp_data);
-					return -1;
-				}
 			}
 			else { 
 				// Partial buffer send, requeue remaining bytes.
