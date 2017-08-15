@@ -8,6 +8,7 @@ SET(CMAKE_LIBRARY_PATH ${CMAKE_LIBRARY_PATH}
 )
   
 SET(sprocket_SRCS
+	str.c
 	ws_ht_parser.c
 	ws_magic.c
 	ws_frame_buffer.c

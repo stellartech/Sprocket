@@ -24,5 +24,6 @@ IF(SPROCKET_TESTS)
 	ADD_SPROCKET_TEST(check_ws_msg)
 	ADD_SPROCKET_TEST(check_th_pool_ex)
 	ADD_SPROCKET_TEST(check_listener)
+	ADD_SPROCKET_TEST(check_str)
 ENDIF()
 
