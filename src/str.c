@@ -1,8 +1,6 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <stdint.h>
 
 #include "str.h"
 
@@ -13,10 +11,38 @@ extern C {
 struct _str
 {
 	int		refcount;
+	uint32_t	hash;
 	int		len;
 	const char	*str;
 };
 
+static inline uint32_t
+hash_func(const char *inp_key, int in_len)
+{
+	register uint32_t hash = 5381;
+	/* variant with the hash unrolled eight times */
+	for (; in_len >= 8; in_len -= 8) {
+		hash = ((hash << 5) + hash) + *inp_key++;
+		hash = ((hash << 5) + hash) + *inp_key++;
+		hash = ((hash << 5) + hash) + *inp_key++;
+		hash = ((hash << 5) + hash) + *inp_key++;
+		hash = ((hash << 5) + hash) + *inp_key++;
+		hash = ((hash << 5) + hash) + *inp_key++;
+		hash = ((hash << 5) + hash) + *inp_key++;
+		hash = ((hash << 5) + hash) + *inp_key++;
+	}
+	switch (in_len) {
+		case 7: hash = ((hash << 5) + hash) + *inp_key++; /* fallthrough... */
+		case 6: hash = ((hash << 5) + hash) + *inp_key++; /* fallthrough... */
+		case 5: hash = ((hash << 5) + hash) + *inp_key++; /* fallthrough... */
+		case 4: hash = ((hash << 5) + hash) + *inp_key++; /* fallthrough... */
+		case 3: hash = ((hash << 5) + hash) + *inp_key++; /* fallthrough... */
+		case 2: hash = ((hash << 5) + hash) + *inp_key++; /* fallthrough... */
+		case 1: hash = ((hash << 5) + hash) + *inp_key++; break;
+		case 0: default: break;
+	}
+	return hash;
+}
 
 str_pt
 str_ctor(const char *inp, int in_len)
@@ -29,6 +55,7 @@ str_ctor(const char *inp, int in_len)
 			return NULL;
 		}
 		memcpy((void*)p_self->str, inp, in_len);
+		p_self->hash = hash_func(inp, in_len);
 		p_self->refcount = 1;
 		p_self->len = in_len;
 	}
@@ -94,6 +121,7 @@ str_concat(str_pt inp_self, str_pt inp_other)
 		inp_self->str = realloc((void*)inp_self->str, new_len + 1);
 		memcpy((void*)&inp_self->str[inp_self->len], inp_other->str, inp_other->len);
 		inp_self->len = new_len;
+		inp_self->hash = hash_func(inp_self->str, inp_self->len);
 		*((char*)(inp_self->str + new_len)) = '\0';
 	}
 	return inp_self;
@@ -116,6 +144,15 @@ str_get_refcount(str_pt inp_self)
 		return inp_self->refcount;
 	}
 	return -1;
+}
+
+uint32_t
+str_get_hash(str_pt inp_self)
+{
+	if(inp_self) {
+		return inp_self->hash;
+	}
+	return 0;
 }
 
 #ifdef __cplusplus
