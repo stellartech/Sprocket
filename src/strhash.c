@@ -79,14 +79,14 @@ strhash_bin_free(strhash_bin_pt inp_self, strhash_void_free_fn in_fnf)
 		if(in_fnf && inp_self->p_value) {
 			(in_fnf)(inp_self->p_value);
 		}
-		if(inp_self->p_key) free((void*)inp_self->p_key);
+		str_decref(inp_self->p_key);
 		free(inp_self);
 	}
 	return p_next;
 }
   
 void
-strhash_free(strhash_pt inp_self)
+strhash_decref(strhash_pt inp_self)
 {
 	if(inp_self) {
 		pthread_mutex_lock(&inp_self->lock);	
@@ -111,7 +111,7 @@ strhash_dtor(strhash_pt *inpp)
 {
 	if(inpp) {
 		strhash_pt p_self = *inpp;
-		if(p_self) strhash_free(p_self);
+		if(p_self) strhash_decref(p_self);
 		*inpp = NULL;
 	}
 }
@@ -143,24 +143,29 @@ strhash_find(strhash_pt inp_self, str_pt inp_strkey)
 }
   
 void*
-strhash_find_ex(strhash_pt inp_self, const char *inp_key)
+strhash_findl_ex(strhash_pt inp_self, const char *inp_key, int in_key_len)
 {
 	void *p_rval = NULL;
-	str_pt p_temp = str_ctor(inp_key, strlen(inp_key));
+	str_pt p_temp = str_ctor(inp_key, in_key_len);
 	p_rval = strhash_find(inp_self, p_temp);
-	str_free(p_temp);
+	str_decref(p_temp);
 	return p_rval;
 }
   
+void*
+strhash_find_ex(strhash_pt inp_self, const char *inp_key)
+{
+	return strhash_findl_ex(inp_self, inp_key, strlen(inp_key));
+}
+  
 int
-strhash_insert(strhash_pt inp_self, str_pt inp_strkey, void *inp_val) //const char *inp_key, void *inp_val)
+strhash_insert(strhash_pt inp_self, str_pt inp_strkey, void *inp_val)
 {
 	int bin;
-	int hash = str_get_hash(inp_strkey); //hash_func(inp_key, strlen(inp_key));
+	int hash = str_get_hash(inp_strkey);
 	if(pthread_mutex_lock(&inp_self->lock) != 0) {
 		return -1;
 	}
-	bin = hash & inp_self->bin_mask;
 	strhash_bin_pt p_bin = calloc(1, sizeof(strhash_bin_t));
 	if(!p_bin) {
 		pthread_mutex_unlock(&inp_self->lock);
@@ -169,6 +174,7 @@ strhash_insert(strhash_pt inp_self, str_pt inp_strkey, void *inp_val) //const ch
 	p_bin->hash = hash;
 	p_bin->p_value = inp_val;
 	p_bin->p_key = str_copy_byref(inp_strkey);
+	bin = hash & inp_self->bin_mask;
 	if(!inp_self->p_bins[bin]) {
 		inp_self->p_bins[bin] = p_bin;
 	}
@@ -182,11 +188,11 @@ strhash_insert(strhash_pt inp_self, str_pt inp_strkey, void *inp_val) //const ch
 }
   
 void*
-strhash_remove(strhash_pt inp_self, str_pt inp_strkey) //const char *inp_key)
+strhash_remove(strhash_pt inp_self, str_pt inp_strkey)
 {
 	int bin;
 	void *p_rval = NULL;
-	int hash = str_get_hash(inp_strkey); //hash_func(inp_key, strlen(inp_key));
+	int hash = str_get_hash(inp_strkey);
 	int search_key_len = str_get_len(inp_strkey);
 	const char *p_search_key = str_get(inp_strkey);
 	if(pthread_mutex_lock(&inp_self->lock) != 0) {
@@ -218,10 +224,10 @@ strhash_remove(strhash_pt inp_self, str_pt inp_strkey) //const char *inp_key)
 }
   
 int
-strhash_delete(strhash_pt inp_self, str_pt inp_strkey) //const char *inp_key)
+strhash_delete(strhash_pt inp_self, str_pt inp_strkey)
 {
 	int bin;
-	int hash = str_get_hash(inp_strkey); //hash_func(inp_key, strlen(inp_key));
+	int hash = str_get_hash(inp_strkey);
 	int search_key_len = str_get_len(inp_strkey);
 	const char *p_search_key = str_get(inp_strkey);
 	if(pthread_mutex_lock(&inp_self->lock) != 0) {

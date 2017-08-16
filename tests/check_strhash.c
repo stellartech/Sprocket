@@ -26,6 +26,7 @@
 #include "../src/strhash.h"
 
 #define INDEX_STR "index_str"
+#define TEST_STR "Test Me"
 
 strhash_pt p = NULL;
 str_pt p_key = NULL;
@@ -33,15 +34,16 @@ str_pt p_key = NULL;
 void setup(void)
 {
 	p_key = str_ctor(INDEX_STR, strlen(INDEX_STR));
-	char *p_value = strdup("Test me");
+	char *p_value = strdup(TEST_STR);
 	p = strhash_ctor(32, free);
 	strhash_insert(p, p_key, p_value);
+	str_decref(p_key);
 }
 
 void teardown(void)
 {
 	strhash_dtor(&p);
-	str_free(p_key);
+	//str_decref(p_key);
 }
 
 START_TEST(test_strhash_find)
@@ -50,7 +52,17 @@ START_TEST(test_strhash_find)
 	ck_assert(strhash_count(p) == 1);
 	actual = strhash_find(p, p_key);
 	ck_assert(actual);
-	ck_assert_str_eq(actual, "Test me");
+	ck_assert_str_eq(TEST_STR, actual);
+}
+END_TEST
+
+START_TEST(test_strhash_find_ex)
+{
+	char *actual = NULL;
+	ck_assert(strhash_count(p) == 1);
+	actual = strhash_find_ex(p, INDEX_STR);
+	ck_assert(actual);
+	ck_assert_str_eq(TEST_STR, actual);
 }
 END_TEST
 
@@ -69,7 +81,7 @@ START_TEST(test_strhash_remove)
 	ck_assert(strhash_count(p) == 1);
 	actual = strhash_remove(p, p_key);
 	ck_assert(strhash_count(p) == 0);
-	ck_assert_str_eq(actual, "Test me");
+	ck_assert_str_eq(TEST_STR, actual);
 	free(actual);
 }
 END_TEST
@@ -84,6 +96,7 @@ Suite *suite()
 	tc_core = tcase_create("Core");
 	tcase_add_checked_fixture(tc_core, setup, teardown);
 	tcase_add_test(tc_core, test_strhash_find);
+	tcase_add_test(tc_core, test_strhash_find_ex);
 	tcase_add_test(tc_core, test_strhash_delete);
 	tcase_add_test(tc_core, test_strhash_remove);
 	suite_add_tcase(s, tc_core);

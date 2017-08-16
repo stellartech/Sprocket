@@ -39,7 +39,7 @@ void setup(void)
 
 void teardown(void)
 {
-	str_free(p_str);
+	str_decref(p_str);
 }
 
 START_TEST(test_str_ctor)
@@ -48,10 +48,22 @@ START_TEST(test_str_ctor)
 }
 END_TEST
 
+START_TEST(test_str_steal_ctor)
+{
+	int len = -1;
+	str_pt p_temp = str_steal_ctor(
+		strndup(STR1, strlen(STR1)), // Returned pointer is "owned" by p_temp
+		strlen(STR1));               // and is free()ed by str_decref() below
+	ck_assert_str_eq(STR1, str_get_with_len(p_temp, &len));
+	ck_assert_int_eq(strlen(STR1), len);
+	str_decref(p_temp);
+}
+END_TEST
+
 START_TEST(test_str_get_len)
 {
 	ck_assert(p_str);
-	ck_assert_int_eq(str_get_len(p_str), strlen(STR1));
+	ck_assert_int_eq(strlen(STR1), str_get_len(p_str));
 }
 END_TEST
 
@@ -67,7 +79,7 @@ START_TEST(test_str_copy_byref)
 	ck_assert_str_eq(STR1, s);
 	s = str_get(p_str2);
 	ck_assert_str_eq(STR1, s);
-	str_free(p_str2);
+	str_decref(p_str2);
 	ck_assert_int_eq(1, str_get_refcount(p_str));
 }
 END_TEST
@@ -82,7 +94,7 @@ START_TEST(test_str_dup)
 	ck_assert_str_eq(STR1, s);
 	s = str_get(p_str2);
 	ck_assert_str_eq(STR1, s);
-	str_free(p_str2);
+	str_decref(p_str2);
 	ck_assert_int_eq(1, str_get_refcount(p_str));
 }
 END_TEST
@@ -102,7 +114,7 @@ START_TEST(test_str_concat)
 	ck_assert_int_eq(strlen(STR1) + strlen(STR2), str_get_len(p_str));
 	s = str_get(p_str);
 	ck_assert_str_eq(STR1 STR2, s);
-	str_free(p_str2);
+	str_decref(p_str2);
 }
 END_TEST
 
@@ -124,6 +136,7 @@ Suite *suite()
 	tc_core = tcase_create("Core");
 	tcase_add_checked_fixture(tc_core, setup, teardown);
 	tcase_add_test(tc_core, test_str_ctor);
+	tcase_add_test(tc_core, test_str_steal_ctor);
 	tcase_add_test(tc_core, test_str_copy_byref);
 	tcase_add_test(tc_core, test_str_dup);
 	tcase_add_test(tc_core, test_str_get_len);

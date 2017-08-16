@@ -14,8 +14,11 @@ typedef struct _str * str_pt;
 str_pt
 str_ctor(const char *inp, int in_len);
 
+str_pt
+str_steal_ctor(const char *inp, int in_len);
+
 void
-str_free(str_pt in_str);
+str_decref(str_pt in_str);
 
 str_pt
 str_dup(str_pt inp_self);

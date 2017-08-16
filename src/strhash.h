@@ -31,16 +31,19 @@ size_t
 strhash_count(strhash_pt inp_self);
 
 void
-strhash_free(strhash_pt inp_self);
+strhash_decref(strhash_pt inp_self);
   
 void
 strhash_dtor(strhash_pt *inpp);
   
 void*
-strhash_findl(strhash_pt inp_self, str_pt inp_strkey);
+strhash_find(strhash_pt inp_self, str_pt inp_strkey);
 
 void*
-strhash_find(strhash_pt inp_self, str_pt inp_strkey);
+strhash_findl_ex(strhash_pt inp_self, const char *inp_key, int in_key_len);
+
+void*
+strhash_find_ex(strhash_pt inp_self, const char *inp_key);
   
 int
 strhash_insert(strhash_pt inp_self, str_pt inp_strkey, void *inp_val);

@@ -49,12 +49,11 @@ str_ctor(const char *inp, int in_len)
 {
 	str_pt p_self = calloc(1, sizeof(str_t));
 	if(p_self) {
-		p_self->str = calloc(1, in_len + 1);
+		p_self->str = strndup(inp, in_len); //calloc(1, in_len + 1);
 		if(!p_self->str) {
 			free(p_self);
 			return NULL;
 		}
-		memcpy((void*)p_self->str, inp, in_len);
 		p_self->hash = hash_func(inp, in_len);
 		p_self->refcount = 1;
 		p_self->len = in_len;
@@ -62,8 +61,21 @@ str_ctor(const char *inp, int in_len)
 	return p_self;
 }
 
+str_pt
+str_steal_ctor(const char *inp, int in_len)
+{
+	str_pt p_self = calloc(1, sizeof(str_t));
+	if(p_self) {
+		p_self->str = inp;
+		p_self->refcount = 1;
+		p_self->len = in_len;
+		p_self->hash = hash_func(inp, in_len);
+	}
+	return p_self;
+}
+
 void
-str_free(str_pt inp_self)
+str_decref(str_pt inp_self)
 {
 	if(inp_self) {
 		__sync_fetch_and_sub(&inp_self->refcount, 1);
