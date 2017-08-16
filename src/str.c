@@ -74,6 +74,16 @@ str_steal_ctor(const char *inp, int in_len)
 	return p_self;
 }
 
+str_pt
+str_copy_ctor(str_pt inp_self)
+{
+	str_pt p_dup = NULL;
+	if(inp_self) {
+		p_dup = str_ctor(inp_self->str, inp_self->len);
+	}
+	return p_dup;
+}
+
 void
 str_decref(str_pt inp_self)
 {
@@ -113,16 +123,6 @@ str_copy_byref(str_pt inp_self)
 		__sync_fetch_and_add(&inp_self->refcount, 1);
 	}
 	return inp_self;
-}
-
-str_pt
-str_dup(str_pt inp_self)
-{
-	str_pt p_dup = NULL;
-	if(inp_self) {
-		p_dup = str_ctor(inp_self->str, inp_self->len);
-	}
-	return p_dup;
 }
 
 str_pt

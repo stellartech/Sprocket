@@ -84,12 +84,12 @@ START_TEST(test_str_copy_byref)
 }
 END_TEST
 
-START_TEST(test_str_dup)
+START_TEST(test_str_copy_ctor)
 {
 	const char *s;
 	str_pt p_str2;
 	ck_assert(p_str);
-	p_str2 = str_dup(p_str);
+	p_str2 = str_copy_ctor(p_str);
 	s = str_get(p_str);
 	ck_assert_str_eq(STR1, s);
 	s = str_get(p_str2);
@@ -138,7 +138,7 @@ Suite *suite()
 	tcase_add_test(tc_core, test_str_ctor);
 	tcase_add_test(tc_core, test_str_steal_ctor);
 	tcase_add_test(tc_core, test_str_copy_byref);
-	tcase_add_test(tc_core, test_str_dup);
+	tcase_add_test(tc_core, test_str_copy_ctor);
 	tcase_add_test(tc_core, test_str_get_len);
 	tcase_add_test(tc_core, test_str_concat);
 	tcase_add_test(tc_core, test_str_get_with_len);

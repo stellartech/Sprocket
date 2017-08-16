@@ -15,13 +15,13 @@ str_pt
 str_ctor(const char *inp, int in_len);
 
 str_pt
+str_copy_ctor(str_pt inp_self);
+
+str_pt
 str_steal_ctor(const char *inp, int in_len);
 
 void
 str_decref(str_pt in_str);
-
-str_pt
-str_dup(str_pt inp_self);
 
 str_pt
 str_copy_byref(str_pt inp_self);
