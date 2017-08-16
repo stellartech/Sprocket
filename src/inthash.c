@@ -140,6 +140,9 @@ int
 inthash_insert(inthash_pt inp_self, int in_index, void *inp_val)
 {
 	int bin;
+	if(inthash_find(inp_self, in_index) != NULL) {
+		inthash_delete(inp_self, in_index);
+	}
 	if(pthread_mutex_lock(&inp_self->lock) != 0) {
 		return -1;
 	}

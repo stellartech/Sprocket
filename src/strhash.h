@@ -48,6 +48,14 @@ strhash_find_ex(strhash_pt inp_self, const char *inp_key);
 int
 strhash_insert(strhash_pt inp_self, str_pt inp_strkey, void *inp_val);
   
+int
+strhash_insertl_ex(strhash_pt inp_self, 
+	const char *inp_key, int in_keylen, void *inp_val);
+
+int
+strhash_insert_ex(strhash_pt inp_self, 
+	const char *inp_key, void *inp_val);
+
 void*
 strhash_remove(strhash_pt inp_self, str_pt inp_strkey);
   

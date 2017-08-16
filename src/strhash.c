@@ -163,6 +163,9 @@ strhash_insert(strhash_pt inp_self, str_pt inp_strkey, void *inp_val)
 {
 	int bin;
 	int hash = str_get_hash(inp_strkey);
+	if(strhash_find(inp_self, inp_strkey) != NULL) {
+		strhash_delete(inp_self, inp_strkey);
+	}
 	if(pthread_mutex_lock(&inp_self->lock) != 0) {
 		return -1;
 	}
@@ -186,6 +189,22 @@ strhash_insert(strhash_pt inp_self, str_pt inp_strkey, void *inp_val)
 	return 0;
 }
   
+int
+strhash_insertl_ex(strhash_pt inp_self, const char *inp_key, int in_keylen, void *inp_val)
+{
+	int rval = 0;
+	str_pt p = str_ctor(inp_key, in_keylen);
+	rval = strhash_insert(inp_self, p, inp_val);
+	str_decref(p);
+	return rval;	
+}
+
+int
+strhash_insert_ex(strhash_pt inp_self, const char *inp_key, void *inp_val)
+{
+	return strhash_insertl_ex(inp_self, inp_key, strlen(inp_key), inp_val);
+}
+
 void*
 strhash_remove(strhash_pt inp_self, str_pt inp_strkey)
 {
