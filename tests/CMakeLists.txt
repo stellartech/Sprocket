@@ -14,6 +14,7 @@ IF(SPROCKET_TESTS)
 
 	ADD_SPROCKET_TEST(check_ws_ht_parser)
 	ADD_SPROCKET_TEST(check_hashmap)
+	ADD_SPROCKET_TEST(check_strhash)
 	ADD_SPROCKET_TEST(check_llist)
 	ADD_SPROCKET_TEST(check_queue)
 	ADD_SPROCKET_TEST(check_buffer)

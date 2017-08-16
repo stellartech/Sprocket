@@ -11,12 +11,12 @@ extern C {
 struct _str
 {
 	int		refcount;
-	uint32_t	hash;
+	int		hash;
 	int		len;
 	const char	*str;
 };
 
-static inline uint32_t
+static inline int 
 hash_func(const char *inp_key, int in_len)
 {
 	register uint32_t hash = 5381;
@@ -146,7 +146,7 @@ str_get_refcount(str_pt inp_self)
 	return -1;
 }
 
-uint32_t
+int
 str_get_hash(str_pt inp_self)
 {
 	if(inp_self) {

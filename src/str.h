@@ -38,7 +38,7 @@ str_get_len(str_pt inp_self);
 int
 str_get_refcount(str_pt inp_self);
 
-uint32_t
+int
 str_get_hash(str_pt inp_self);
 
 #ifdef __cplusplus

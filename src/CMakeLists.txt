@@ -17,6 +17,7 @@ SET(sprocket_SRCS
 	ws_msg.c
 	listener.c
 	hashmap.c
+	strhash.c
 	base64.c
 	llist.c
 	buffer.c
