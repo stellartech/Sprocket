@@ -30,6 +30,13 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <sys/eventfd.h>
+
+#include <time.h>
+#include <stdio.h>
+
+#include <nanomsg/nn.h>
+#include <nanomsg/pubsub.h>
 
 #include "reactor.h"
 
@@ -156,7 +163,28 @@ reactor_epoll_accept(reactor_pt inp_self, int listening_fd)
 int
 reactor_loop_once_for(reactor_pt inp_self, int in_timeout)
 {
-	if(inp_self) {
+	int t;
+	struct epoll_event *p_event = NULL;
+
+	if(!inp_self) {
+		return -1;
+	}
+
+	if(in_timeout == 0) {
+		t = 1;
+		in_timeout = 1;
+	}
+	else {
+		// Ensure timeout is even and then split the
+		// the timeout across the two event_wait() calls.
+		if((in_timeout % 2) == 1) {
+			in_timeout++;
+		}
+		t = in_timeout / 2;
+		in_timeout = 1;
+	}
+
+	for( ; t ; t--) {
 		int n = 0;
 		struct epoll_event *p_event = NULL;
 		// Look for new connections.
@@ -251,6 +279,116 @@ reactor_set_event_flags(reactor_pt inp_self, uint32_t in_flags)
 	}
 	return inp_self;
 }
+
+
+/*********************************************************************
+The following code runs in a seperate thread of execution. It handles
+the listening socket io for new incoming connections, accepts them when
+they arrive and created a new epoll fd for the newly arriving connection
+and adds it to the reactor epoll event system. Also, it listens for an
+eventfd change to non-zero to indicate that it should terminate the thd.
+**********************************************************************/
+
+static int
+reactor_listener_accept(
+	int in_listening_fd, 
+	int out_fd, 
+	int out_nn,
+	void *inp_userdata)
+{
+	char log[256];
+	int new_fd;
+	socklen_t in_len;
+	struct sockaddr in_addr;
+	while((new_fd = accept(in_listening_fd, &in_addr, &in_len)) != -1) {
+		struct epoll_event event;
+		int rc = fcntl(new_fd, F_GETFL, 0);
+		if(rc < 0) {
+			close(new_fd);
+			continue;
+		}
+		rc |= O_NONBLOCK;
+		fcntl(new_fd, F_SETFL, rc);
+		event.data.ptr = inp_userdata;
+		event.events = 0; 
+		rc = epoll_ctl(out_fd, EPOLL_CTL_ADD, new_fd, &event);
+		if(out_nn > 0) {
+			int len = 0;
+			char *p_log = NULL;
+			time_t raw = time (&raw);
+			struct tm *info = localtime (&raw);
+			char *datetext = asctime (info);
+			len = snprintf(NULL, 0, "log|[%s] New connection from foo", datetext);
+			p_log = calloc(1, len + 1);
+			snprintf(p_log, len - 1, "log|[%s] New connection from foo", datetext);
+			nn_send(out_nn, log, len, NN_DONTWAIT);
+			free(p_log);
+		}
+        }
+        return 0;
+}
+
+static int
+reactor_listener_thdfunc(
+	int in_listen_to_fd, // The Socker IO fd to listen for new connections
+	int in_shutdown_fd,  // FD goes non-zero then I shutdown this thread
+	int out_fd,          // Add new FD for new connection to this epoll group
+	void *inp_userdata)
+{
+	int fd, nn_sock, stay_alive = 1;
+
+	if((nn_sock = nn_socket(AF_SP, NN_PUB)) > 0) {
+		nn_bind(nn_sock, "ipc:///tmp/reactor_listener_logger");
+	}
+
+	if(nn_sock < 1) {
+		return -1;
+	}
+
+	if((fd = epoll_create1(0)) == -1) {
+		return 0;
+	}
+
+	{	// Add listener FD to my epoll 
+		struct epoll_event event;
+                event.data.fd = in_listen_to_fd;
+                event.events = EPOLLIN;
+                epoll_ctl(fd, EPOLL_CTL_ADD, in_listen_to_fd, &event);
+	}
+	{	// Add shutdown FD to my epoll 
+		struct epoll_event event;
+                event.data.fd = in_shutdown_fd;
+                event.events = EPOLLIN;
+                epoll_ctl(fd, EPOLL_CTL_ADD, in_shutdown_fd, &event);
+	}
+
+	while(stay_alive) {
+		struct epoll_event events[2];
+		int n = epoll_wait(fd, events, 2, 1);
+		for(int i = 0; i < n; i++) {
+			if(events[i].data.fd == in_shutdown_fd) {
+				stay_alive = 0;
+				break;
+			}
+			else if(events[i].data.fd == in_listen_to_fd) {
+				// Handle new connection.
+				reactor_listener_accept(
+					in_listen_to_fd,
+					out_fd,
+					nn_sock,
+					inp_userdata);
+			}
+		}
+	}
+
+	if(nn_sock > 0) {
+		nn_shutdown(nn_sock);
+	}
+
+	close(fd);
+	return 0;
+}
+
 
 #ifdef __cplusplus
 }
