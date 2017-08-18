@@ -25,8 +25,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../src/buffer.h"
-
+#include "../src/utils/buffer.h"
 
 static unsigned char test_string1[] = "This quick brown fox";
 static unsigned char test_string2[] = " foo bar baz";
@@ -42,8 +41,6 @@ void setup(void)
 void teardown(void)
 {
 	ck_assert(p_buf);
-	buffer_dtor(&p_buf);
-	ck_assert(!p_buf);
 }
 
 START_TEST(test_buffer_basic)
@@ -76,8 +73,7 @@ START_TEST(test_buffer_byref)
 	ck_assert(p_local);
 	ck_assert_msg(memcmp(buffer_ptr(p_local), test_string1, sizeof(test_string1)-1) == 0,
 		"failed memcmp at line %d", __LINE__);
-	buffer_dtor(&p_local);
-	ck_assert(p_local);
+	buffer_free(p_local);
 	ck_assert_msg(memcmp(buffer_ptr(p_local), test_string1, sizeof(test_string1)-1) == 0,
 		"failed memcmp at line %d", __LINE__);
 

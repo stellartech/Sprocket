@@ -10,7 +10,7 @@
 #define WS_FRAG_FRIEND
 #include "ws_frag.h"
 
-#include "buffer.h"
+#include "utils/buffer.h"
 
 #ifdef WS_MSG_FRIEND
 struct _ws_msg

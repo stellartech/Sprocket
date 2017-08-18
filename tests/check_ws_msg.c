@@ -96,8 +96,7 @@ START_TEST(test_ws_msg_looped)
 	buffer_pt p_buffer = ws_msg_pullup_as_buffer(p_local);
 	ck_assert(memcmp(buffer_ptr(p_buffer), &p_test_data1[offset1], test_size) == 0);
 	ck_assert(memcmp(buffer_ptr(p_buffer)+test_size, &p_test_data2[offset2], test_size) == 0);
-	buffer_dtor(&p_buffer);
-	ck_assert(!p_buffer);
+	buffer_free(p_buffer);
 	
 	free(p_test_data1);
 	free(p_test_data2);

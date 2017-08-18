@@ -54,25 +54,10 @@ void
 buffer_free(buffer_pt inp_self)
 {
 	if(inp_self) {
-		inp_self->refcount--;
+		__sync_fetch_and_sub(&inp_self->refcount, 1);
 		if(inp_self->refcount == 0) {
 			if(inp_self->p_buf) free(inp_self->p_buf);
 			free(inp_self);
-		}
-	}
-}
-
-void
-buffer_dtor(buffer_pt *inpp_self)
-{
-	if(inpp_self) {
-		buffer_pt p_self = *inpp_self;
-		if(p_self) {
-			uint64_t refcount = p_self->refcount - 1;
-			buffer_free(p_self);
-			if(refcount == 0) {
-				*inpp_self = NULL;
-			}
 		}
 	}
 }

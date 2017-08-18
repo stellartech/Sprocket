@@ -15,8 +15,7 @@ SET(sprocket_SRCS
 	ws_frag.c
 	ws_msg.c
 	listener.c
-	buffer.c
-	iovarr.c
+	utils/iovarr.c
 	utils/queue.c
 	utils/base64.c
 	utils/hashmap.c
@@ -25,6 +24,7 @@ SET(sprocket_SRCS
 	utils/inthash.c
 	utils/llist.c
 	utils/thpool.c
+	utils/buffer.c
 	ws_wire.c
 	ipaddr.c
 	tcp_server/tcp_sock_server.c

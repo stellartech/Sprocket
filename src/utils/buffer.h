@@ -25,9 +25,6 @@ buffer_new_byval(void* inp, uint64_t in_len);
 void
 buffer_free(buffer_pt inp_self);
 
-void
-buffer_dtor(buffer_pt *inpp_self);
-
 const void*
 buffer_ptr(buffer_pt inp_self);
 
