@@ -30,7 +30,7 @@
 #include <nanomsg/nn.h>
 #include <nanomsg/pipeline.h>
 
-#include "../src/thpool.h"
+#include "../src/utils/thpool.h"
 
 #define SOCKET_ADDRESS "inproc://a"
 

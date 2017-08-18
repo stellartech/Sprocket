@@ -24,7 +24,7 @@ SET(sprocket_SRCS
 	utils/strhash.c
 	utils/inthash.c
 	utils/llist.c
-	thpool.c
+	utils/thpool.c
 	ws_wire.c
 	ipaddr.c
 	tcp_server/tcp_sock_server.c
