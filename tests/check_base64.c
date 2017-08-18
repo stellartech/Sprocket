@@ -25,7 +25,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../src/base64.h"
+#include "../src/utils/base64.h"
 
 
 static unsigned char test_string[] = "This quick brown fox";

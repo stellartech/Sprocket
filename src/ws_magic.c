@@ -4,7 +4,7 @@
 #include <malloc.h>
 #include <openssl/sha.h>
   
-#include "base64.h"
+#include "utils/base64.h"
 #include "ws_magic.h"
   
 #ifdef  __cplusplus

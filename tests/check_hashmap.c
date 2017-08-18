@@ -23,7 +23,7 @@
 #include <check.h>
 #include <stdlib.h>
 
-#include "../src/hashmap.h"
+#include "../src/utils/hashmap.h"
 
 
 hashmap_pt p = NULL;

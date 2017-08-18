@@ -382,7 +382,7 @@ reactor_listener_thdfunc(
 	}
 
 	if(nn_sock > 0) {
-		nn_shutdown(nn_sock);
+		//nn_shutdown(nn_sock);
 	}
 
 	close(fd);

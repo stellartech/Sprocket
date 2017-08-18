@@ -8,8 +8,8 @@
 
 #include <arpa/inet.h>
 
-#include "../llist.h"
-#include "../hashmap.h"
+#include "../utils/llist.h"
+#include "../utils/hashmap.h"
 
 #ifdef __cplusplus
 extern C {

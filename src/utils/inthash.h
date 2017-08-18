@@ -1,8 +1,6 @@
 #ifndef INTHASH_H_INCLUDED
 #define INTHASH_H_INCLUDED
   
-#include "str.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

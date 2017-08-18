@@ -8,7 +8,6 @@ SET(CMAKE_LIBRARY_PATH ${CMAKE_LIBRARY_PATH}
 )
   
 SET(sprocket_SRCS
-	str.c
 	ws_ht_parser.c
 	ws_magic.c
 	ws_frame_buffer.c
@@ -16,14 +15,15 @@ SET(sprocket_SRCS
 	ws_frag.c
 	ws_msg.c
 	listener.c
-	hashmap.c
-	strhash.c
-	inthash.c
-	base64.c
-	llist.c
 	buffer.c
 	iovarr.c
-	queue.c
+	utils/queue.c
+	utils/base64.c
+	utils/hashmap.c
+	utils/str.c
+	utils/strhash.c
+	utils/inthash.c
+	utils/llist.c
 	thpool.c
 	ws_wire.c
 	ipaddr.c

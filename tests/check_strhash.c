@@ -23,7 +23,7 @@
 #include <check.h>
 #include <stdlib.h>
 
-#include "../src/strhash.h"
+#include "../src/utils/strhash.h"
 
 #define INDEX_STR "index_str"
 #define TEST_STR "Test Me"

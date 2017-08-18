@@ -23,7 +23,7 @@
 #include <check.h>
 #include <stdlib.h>
 
-#include "../src/llist.h"
+#include "../src/utils/llist.h"
 
 #define NUM_OF_ELES 4
 

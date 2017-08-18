@@ -23,7 +23,7 @@
 #include <check.h>
 #include <stdlib.h>
 
-#include "../src/queue.h"
+#include "../src/utils/queue.h"
 
 #define NUM_OF_ELES 4
 

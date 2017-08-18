@@ -26,7 +26,7 @@
 #include <string.h>
 #include <stdint.h>
 
-#include "../src/base64.h"
+#include "../src/utils/base64.h"
 #include "../src/ws_magic.h"
 
 static uint8_t accept_string[] = "dGhlIHNhbXBsZSBub25jZQ==";

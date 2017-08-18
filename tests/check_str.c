@@ -25,7 +25,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../src/str.h"
+#include "../src/utils/str.h"
 
 #define STR1 "This quick brown fox"
 #define STR2 " jumped over the cow"

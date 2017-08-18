@@ -23,7 +23,7 @@
 #include <check.h>
 #include <stdlib.h>
 
-#include "../src/inthash.h"
+#include "../src/utils/inthash.h"
 
 #define STR0 "1Test Me1"
 #define STR1 "2Test Me2"
