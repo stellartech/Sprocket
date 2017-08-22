@@ -22,7 +22,7 @@
 
 #include <check.h>
 
-#include "../src/ws_ht_parser.h"
+#include "websocket/ws_ht_parser.h"
 
 static const char data[] =
 	"GET /connect/0123456789012345678901234567891 HTTP/1.1\r\n"

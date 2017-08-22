@@ -27,7 +27,7 @@
 #include <stdint.h>
 
 #include "../src/utils/base64.h"
-#include "../src/ws_magic.h"
+#include "../src/utils/ws_magic.h"
 
 static uint8_t accept_string[] = "dGhlIHNhbXBsZSBub25jZQ==";
 static uint8_t response_string[] = "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=";

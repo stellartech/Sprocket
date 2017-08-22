@@ -8,13 +8,8 @@ SET(CMAKE_LIBRARY_PATH ${CMAKE_LIBRARY_PATH}
 )
   
 SET(sprocket_SRCS
-	ws_ht_parser.c
-	ws_magic.c
-	ws_frame_buffer.c
-	ws_frame.c
-	ws_frag.c
-	ws_msg.c
 	listener.c
+	utils/ws_magic.c
 	utils/iovarr.c
 	utils/queue.c
 	utils/base64.c
@@ -25,12 +20,17 @@ SET(sprocket_SRCS
 	utils/llist.c
 	utils/thpool.c
 	utils/buffer.c
-	ws_wire.c
 	ipaddr.c
 	tcp_server/tcp_sock_server.c
 	tcp_server/server_conn.c
 	reactor.c
 	ssl.c
+	websocket/ws_ht_parser.c
+	websocket/ws_frame_buffer.c
+	websocket/ws_frame.c
+	websocket/ws_frag.c
+	websocket/ws_msg.c
+	websocket/ws_wire.c
 )
   
 ADD_LIBRARY(sprocket

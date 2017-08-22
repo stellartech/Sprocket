@@ -72,7 +72,7 @@ conn_dtor(conn_pt *inp_conn)
 	if(inp_conn) {
 		conn_pt p_self = *inp_conn;
 		if(!p_self) return;
-		p_self->refcount = __sync_fetch_and_sub(&p_self->refcount, 1);
+		__sync_fetch_and_sub(&p_self->refcount, 1);
 		if(p_self->refcount > 0) return;
 		if(p_self->p_close_cb) (p_self->p_close_cb)(p_self);
 		pthread_mutex_lock(&p_self->lock);
@@ -100,7 +100,7 @@ conn_pt
 conn_copy_byref(conn_pt inp_self)
 {
 	if(inp_self) {
-		inp_self->refcount = __sync_fetch_and_add(&inp_self->refcount, 1);
+		__sync_fetch_and_add(&inp_self->refcount, 1);
 	}
 	return inp_self;
 }
@@ -108,9 +108,9 @@ conn_copy_byref(conn_pt inp_self)
 void
 conn_timer_counter_inc(conn_pt inp_self)
 {
-	if(inp_self) 
-		inp_self->timer_counter =
-			__sync_fetch_and_add(&inp_self->timer_counter, 1);
+	if(inp_self) {
+		__sync_fetch_and_add(&inp_self->timer_counter, 1);
+	}
 }
 
 int

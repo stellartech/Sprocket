@@ -8,6 +8,9 @@ ws_frag_pt
 ws_frag_ctor(void)
 {
 	ws_frag_pt p_self = calloc(1, sizeof(ws_frag_t));
+	if(p_self) {
+		p_self->refcount = 1;
+	}
 	return p_self;
 }
 
@@ -15,13 +18,16 @@ void
 ws_frag_free(ws_frag_pt inp_self)
 {
 	if(inp_self) {
-		if(inp_self->p_frag) {
-			free(inp_self->p_frag);
+		__sync_fetch_and_sub(&inp_self->refcount, 1);
+		if(inp_self->refcount < 1) {
+			if(inp_self->p_frag) {
+				free(inp_self->p_frag);
+			}
+			if(inp_self->p_next) {
+				ws_frag_free(inp_self->p_next);
+			}
+			free(inp_self);
 		}
-		if(inp_self->p_next) {
-			ws_frag_free(inp_self->p_next);
-		}
-		free(inp_self);
 	}
 }
 

@@ -31,7 +31,7 @@
 #include <sys/types.h>
 
 #define WS_FRAME_FRIEND
-#include "../src/ws_frame.h"
+#include "websocket/ws_frame.h"
 
 void setup(void)
 {

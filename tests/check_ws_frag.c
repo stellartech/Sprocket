@@ -31,7 +31,7 @@
 #include <sys/types.h>
 
 #define WS_FRAG_FRIEND
-#include "../src/ws_frag.h"
+#include "websocket/ws_frag.h"
 
 #include "ws_frag_maker.h"
 

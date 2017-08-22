@@ -37,7 +37,7 @@ ssl_ctor(ssl_ctor_args_t *inp_args)
 	ssl_pt p_self = calloc(1, sizeof(ssl_t));
 	if(p_self) {
 		reactor_ctor_args_t reactor_args;
-		p_self->refcount = __sync_fetch_and_add(&p_self->refcount, 1);
+		p_self->refcount = 1;
 		if((p_self->p_sslctx = SSL_CTX_new(TLSv1_2_method())) == NULL)
 			goto ssl_ctor_fail;
 		if(SSL_CTX_use_certificate_chain_file(p_self->p_sslctx, 
@@ -62,7 +62,7 @@ ssl_free(void *inp)
 {
 	if(inp) {
 		ssl_pt p_self = (ssl_pt)inp;
-		p_self->refcount = __sync_fetch_and_sub(&p_self->refcount, 1);
+		__sync_fetch_and_sub(&p_self->refcount, 1);
 		if(p_self->refcount == 0) {
 			SSL_CTX_free(p_self->p_sslctx);
 			free(inp);

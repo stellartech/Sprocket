@@ -31,10 +31,10 @@
 #include <sys/types.h>
 
 #define WS_FRAG_FRIEND
-#include "../src/ws_frag.h"
+#include "websocket/ws_frag.h"
 
 #define WS_MSG_FRIEND
-#include "../src/ws_msg.h"
+#include "websocket/ws_msg.h"
 
 #include "ws_frag_maker.h"
 

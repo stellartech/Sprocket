@@ -34,7 +34,7 @@
 #include <sys/types.h>
 
 #define WS_FRAG_FRIEND
-#include "../src/ws_frag.h"
+#include "websocket/ws_frag.h"
 
 static uint64_t 
 load_random(uint64_t in_how_much, unsigned char *inp_dst)
