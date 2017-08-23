@@ -20,6 +20,7 @@ SET(sprocket_SRCS
 	utils/llist.c
 	utils/thpool.c
 	utils/buffer.c
+	utils/ssl_context.c
 	ipaddr.c
 	tcp_server/tcp_sock_server.c
 	tcp_server/server_conn.c

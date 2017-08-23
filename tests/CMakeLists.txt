@@ -27,5 +27,6 @@ IF(SPROCKET_TESTS)
 	ADD_SPROCKET_TEST(check_th_pool_ex)
 	ADD_SPROCKET_TEST(check_listener)
 	ADD_SPROCKET_TEST(check_str)
+	ADD_SPROCKET_TEST(check_ssl_context)
 ENDIF()
 
