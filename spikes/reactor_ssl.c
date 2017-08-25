@@ -40,8 +40,9 @@
 
 #include <netdb.h>
 
-#include "../src/reactor.h"
-#include "../src/listener.h"
+#include "reactor.h"
+#include "listener.h"
+#include "utils/ssl_context.h"
 
 #define MAXEVENTS 64
 
@@ -75,7 +76,8 @@ typedef struct
 {
 	reactor_pt 	p_reactor;
 	listener_pt	p_listener;
-	SSL_CTX         *p_sslctx;
+	ssl_context_pt	p_sslctx;
+	//SSL_CTX         *p_sslctx;
 }
 my_globals_t;
 
@@ -88,21 +90,22 @@ main(int argc, char *argv[])
 	int rc, loop_counter = 0;
 	my_globals_t globals;
 
-	SSL_load_error_strings();
-	SSL_library_init();
-	OpenSSL_add_all_algorithms();
+	//SSL_load_error_strings();
+	//SSL_library_init();
+	//OpenSSL_add_all_algorithms();
 
-	globals.p_sslctx = SSL_CTX_new(TLSv1_2_method());
-	SSL_CTX_set_options(globals.p_sslctx, SSL_OP_SINGLE_DH_USE);	
+	//globals.p_sslctx = SSL_CTX_new(TLSv1_2_method());
+	globals.p_sslctx = ssl_context_ctor();
+	//SSL_CTX_set_options(globals.p_sslctx, SSL_OP_SINGLE_DH_USE);	
 
-	rc = SSL_CTX_use_certificate_chain_file(globals.p_sslctx, 
+	rc = ssl_context_use_certificate_chain_file(globals.p_sslctx,
 		"/certs/localhost_ajk_io/localhost.ajk.io.ha.pem");
 	if(rc != 1) {
 		fprintf(stderr, "Error on SSL_CTX_use_certificate_file()\n");
 		return 0;
 	}
-	rc = SSL_CTX_use_PrivateKey_file(globals.p_sslctx,
-		"/certs/localhost_ajk_io/localhost.ajk.io.key", SSL_FILETYPE_PEM);
+	rc = ssl_context_use_privatekey_file(globals.p_sslctx,
+		"/certs/localhost_ajk_io/localhost.ajk.io.key");
 	if(rc != 1) {
 		fprintf(stderr, "Error on SSL_CTX_use_PrivateKey_file()\n");
 		return 0;
@@ -145,14 +148,7 @@ main(int argc, char *argv[])
 
 	// Wow, OpenSSL requires some cleanup on exit!
 	// All these were needed to make Valgrind happy.
-	SSL_CTX_free(globals.p_sslctx);
-	ERR_remove_thread_state(NULL);
-	ENGINE_cleanup();
-	CONF_modules_free();
-	EVP_cleanup();
-	CRYPTO_cleanup_all_ex_data();
-	SSL_COMP_free_compression_methods();
-	ERR_free_strings();
+	ssl_context_free(globals.p_sslctx);
 
 	reactor_dtor(&globals.p_reactor);
 	return 0;
@@ -180,7 +176,7 @@ my_callback_accept(const reactor_cb_args_pt inp_args)
 		int rc;
 		fprintf(stderr, "my_callback_accept()...");
 		my_globals_t *p_globals = (my_globals_t*)inp_args->data.accept_args.p_userdata;
-		SSL_CTX *p_sslctx = p_globals->p_sslctx;
+		ssl_context_pt p_sslctx = p_globals->p_sslctx;
 		if(!p_sslctx) {
 			fprintf(stderr, " fail1\n");
 			close(inp_args->data.accept_args.accecpt_fd);

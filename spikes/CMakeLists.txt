@@ -26,6 +26,6 @@ TARGET_LINK_LIBRARIES(tcps sprocket)
 ADD_EXECUTABLE(reactor reactor.c)
 TARGET_LINK_LIBRARIES(reactor sprocket)
 
-ADD_EXECUTABLE(reactor_ssl reactor_ssl.c)
-TARGET_LINK_LIBRARIES(reactor_ssl sprocket)
+#ADD_EXECUTABLE(reactor_ssl reactor_ssl.c)
+#TARGET_LINK_LIBRARIES(reactor_ssl sprocket)
 

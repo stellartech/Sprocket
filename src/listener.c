@@ -41,7 +41,7 @@ struct _listener
 	//! Socket backlog for listen()
 	int backlog;
 	//! String of user supplied bind addr
-	const char ip[INET6_ADDRSTRLEN];
+	const char ip[INET6_ADDRSTRLEN + 1];
 	//! Opening flags.
 	unsigned flags; // Any number of LEV_OPT_* flags
 	//! Sock struct
@@ -106,7 +106,7 @@ listener_ctor(const char *inp_ip, short in_port)
 	listener_pt p_self = calloc(1, sizeof(listener_t));
 	if(p_self) {
 		if(inp_ip != NULL && in_port > 0) {
-			if(listener_set_ipaddr(p_self, inp_ip) != 1) {
+			if(listener_set_ipaddr(p_self, inp_ip, strlen(inp_ip)) != 1) {
 				listener_free(p_self);
 				return NULL;
 			}
@@ -154,12 +154,39 @@ listener_set_flags(listener_pt inp_self, unsigned in_flags)
 }
 
 int
-listener_set_ipaddr(listener_pt inp_self, const char *inp_addr)
+listener_get_domain(listener_pt inp_self)
 {
 	if(inp_self) {
-		int rc;
+		return inp_self->domain;
+	}
+	return -1;
+}
+
+static int
+count_chars_in_str(const char *inp_str, char in_c, int in_len)
+{
+	int counter = 0;
+	char *s = (char*)inp_str;
+	while(*s && in_len > 0) {
+		if((*s) == in_c) counter++;
+		s++;
+		in_len--;
+	}
+	return counter;
+}
+
+int
+listener_set_ipaddr(listener_pt inp_self, const char *inp_addr, int in_len)
+{
+	if(in_len > INET6_ADDRSTRLEN) {
+		return -3;
+	}
+	if(inp_self) {
+		int periods;
+		memset((void*)inp_self->ip, 0, INET6_ADDRSTRLEN + 1);
 		strncpy((char*)inp_self->ip, inp_addr, INET6_ADDRSTRLEN);
-		inp_self->domain = (strchr(inp_self->ip, ':') == NULL) ? AF_INET : AF_INET6;
+		periods = count_chars_in_str(inp_self->ip, '.', in_len);
+		inp_self->domain = periods == 3 ? AF_INET : AF_INET6;
 		if(inp_self->domain == AF_INET) {
 			inp_self->sock.addr_buf4.sin_family = AF_INET;
 			return inet_pton(AF_INET, inp_self->ip, &inp_self->sock.addr_buf4.sin_addr);

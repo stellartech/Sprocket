@@ -42,7 +42,7 @@ listener_set_flags(listener_pt inp_self,
 
 int
 listener_set_ipaddr(listener_pt inp_self, 
-	const char *inp_addr);
+	const char *inp_addr, int in_len);
 
 listener_pt
 listener_set_backlog(listener_pt inp_self,

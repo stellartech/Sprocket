@@ -27,6 +27,7 @@
 
 #include <openssl/ssl.h>
 #include <openssl/err.h>
+#include <openssl/evp.h>
 #include <openssl/conf.h>
 #include <openssl/engine.h>
 
@@ -49,6 +50,7 @@ ssl_context_ctor(void)
 		p_self->refcount = 1;
 		SSL_load_error_strings();
 		SSL_library_init();
+		OpenSSL_add_all_digests();
 		OpenSSL_add_all_algorithms();
 		p_self->p_context = SSL_CTX_new(TLSv1_2_method());
 		ssl_context_set_options(p_self, SSL_OP_SINGLE_DH_USE);
